@@ -55,7 +55,7 @@ const configFromEnv = (() => {
 
 const config: FirebaseOptions = configFromEnv ?? fallbackConfig;
 
-export const isFirebaseConfigured = Boolean(configFromEnv);
+export const isFirebaseConfigured = Boolean(config);
 
 export const app = getApps().length ? getApps()[0]! : initializeApp(config);
 
