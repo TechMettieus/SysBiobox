@@ -26,24 +26,51 @@ interface OrderFragmentFormProps {
   totalValue: number;
   onSave: (fragments: OrderFragmentType[]) => void;
   onCancel: () => void;
+  orderId?: string;
+  initialFragments?: OrderFragmentType[];
 }
 
 export default function OrderFragmentForm({
   totalQuantity,
   totalValue,
   onSave,
-  onCancel
+  onCancel,
+  orderId,
+  initialFragments = [],
 }: OrderFragmentFormProps) {
-  const [fragments, setFragments] = useState<Partial<OrderFragmentType>[]>([
-    {
-      fragmentNumber: 1,
-      quantity: Math.ceil(totalQuantity / 4),
-      scheduledDate: new Date(),
-      status: 'pending',
-      progress: 0
-    }
-  ]);
+  const [fragments, setFragments] = useState<Partial<OrderFragmentType>[]>(
+    () =>
+      initialFragments.length > 0
+        ? initialFragments.map((fragment) => ({
+            ...fragment,
+            scheduledDate: fragment.scheduledDate
+              ? new Date(fragment.scheduledDate)
+              : new Date(),
+          }))
+        : [
+            {
+              fragmentNumber: 1,
+              quantity: Math.max(1, Math.ceil(totalQuantity / 4)),
+              scheduledDate: new Date(),
+              status: "pending",
+              progress: 0,
+            },
+          ],
+  );
   const [showCalendar, setShowCalendar] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (initialFragments.length > 0) {
+      setFragments(
+        initialFragments.map((fragment) => ({
+          ...fragment,
+          scheduledDate: fragment.scheduledDate
+            ? new Date(fragment.scheduledDate)
+            : new Date(),
+        })),
+      );
+    }
+  }, [initialFragments]);
 
   const addFragment = () => {
     const lastFragment = fragments[fragments.length - 1];
@@ -102,17 +129,26 @@ export default function OrderFragmentForm({
   const handleSave = () => {
     if (!isValid()) return;
 
-    const orderId = Date.now().toString();
-    const completeFragments: OrderFragmentType[] = fragments.map((fragment, index) => ({
-      id: `${orderId}-frag-${index + 1}`,
-      orderId,
-      fragmentNumber: fragment.fragmentNumber!,
-      quantity: fragment.quantity!,
-      scheduledDate: fragment.scheduledDate!,
-      status: fragment.status!,
-      progress: fragment.progress!,
-      value: calculateFragmentValue(fragment.quantity!)
-    }));
+    const baseOrderId =
+      orderId || initialFragments[0]?.orderId || Date.now().toString();
+
+    const completeFragments: OrderFragmentType[] = fragments.map(
+      (fragment, index) => ({
+        id:
+          fragment.id ||
+          `${baseOrderId}-frag-${fragment.fragmentNumber || index + 1}-${Date.now()}`,
+        orderId: baseOrderId,
+        fragmentNumber: fragment.fragmentNumber || index + 1,
+        quantity: fragment.quantity || 0,
+        scheduledDate: fragment.scheduledDate || new Date(),
+        status: fragment.status || "pending",
+        progress: fragment.progress ?? 0,
+        value: calculateFragmentValue(fragment.quantity || 0),
+        assignedOperator: fragment.assignedOperator,
+        startedAt: fragment.startedAt,
+        completedAt: fragment.completedAt,
+      }),
+    );
 
     onSave(completeFragments);
   };
