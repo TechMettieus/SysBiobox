@@ -22,7 +22,11 @@ export default function LoginForm() {
     setIsLoading(true);
 
     try {
-      await login(email, password);
+      const success = await login(email, password);
+      if (!success) {
+        setError("Credenciais inválidas. Verifique e tente novamente.");
+        return;
+      }
       navigate("/"); // 👈 redireciona pro dashboard após login
     } catch (err) {
       if (err instanceof Error) {
