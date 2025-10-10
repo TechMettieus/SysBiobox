@@ -1220,11 +1220,69 @@ export default function OrdersSupabase() {
                   </div>
                 )}
 
+                {selectedOrder.fragments &&
+                  selectedOrder.fragments.length > 0 && (
+                    <div>
+                      <h3 className="font-semibold mb-2">
+                        Fragmentação de Produção
+                      </h3>
+                      <div className="space-y-2">
+                        {selectedOrder.fragments.map((fragment) => (
+                          <div
+                            key={fragment.id}
+                            className="border border-border rounded-lg p-3"
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="font-medium">
+                                Fragmento {fragment.fragment_number} ·{" "}
+                                {fragment.quantity} unidade(s)
+                              </span>
+                              <Badge
+                                className={
+                                  fragmentStatusColors[fragment.status] ||
+                                  fragmentStatusColors.pending
+                                }
+                              >
+                                {fragmentStatusLabels[fragment.status]}
+                              </Badge>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2 text-sm text-muted-foreground">
+                              <span>
+                                Produção: {formatDate(fragment.scheduled_date as any)}
+                              </span>
+                              {fragment.value ? (
+                                <span>
+                                  Valor: {formatCurrency(fragment.value)}
+                                </span>
+                              ) : null}
+                              <span>Progresso: {fragment.progress ?? 0}%</span>
+                              {fragment.assigned_operator ? (
+                                <span>Operador: {fragment.assigned_operator}</span>
+                              ) : null}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                 <div className="flex justify-between">
                   <div className="text-lg font-bold">
                     Total: {formatCurrency(selectedOrder.total_amount)}
                   </div>
                   <div className="space-x-2">
+                    {checkPermission("orders", "edit") &&
+                      !["delivered", "cancelled"].includes(
+                        selectedOrder.status,
+                      ) && (
+                        <Button
+                          variant="outline"
+                          onClick={() => openFragmentForm(selectedOrder)}
+                        >
+                          <Scissors className="h-4 w-4 mr-2" />
+                          Fragmentar Produção
+                        </Button>
+                      )}
                     <Button
                       variant="outline"
                       onClick={() => handlePrintOrder(selectedOrder)}
