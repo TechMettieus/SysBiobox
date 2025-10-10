@@ -26,8 +26,9 @@ const configFromEnv = (() => {
   const messagingSenderId = import.meta.env
     .VITE_FIREBASE_MESSAGING_SENDER_ID as string | undefined;
   const appId = import.meta.env.VITE_FIREBASE_APP_ID as string | undefined;
-  const measurementId = import.meta.env
-    .VITE_FIREBASE_MEASUREMENT_ID as string | undefined;
+  const measurementId = import.meta.env.VITE_FIREBASE_MEASUREMENT_ID as
+    | string
+    | undefined;
 
   if (
     apiKey &&
@@ -46,9 +47,7 @@ const configFromEnv = (() => {
       appId,
     };
 
-    return measurementId
-      ? { ...baseConfig, measurementId }
-      : baseConfig;
+    return measurementId ? { ...baseConfig, measurementId } : baseConfig;
   }
   return null;
 })();

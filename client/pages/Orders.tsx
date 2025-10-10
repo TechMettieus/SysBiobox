@@ -48,7 +48,11 @@ import {
   Scissors,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { useSupabase, Order, OrderFragment as DbOrderFragment } from "@/hooks/useSupabase";
+import {
+  useSupabase,
+  Order,
+  OrderFragment as DbOrderFragment,
+} from "@/hooks/useSupabase";
 import { useToast } from "@/components/ui/use-toast";
 import { useNavigate } from "react-router-dom";
 import { OrderFragment as UiOrderFragment } from "@/types/order";
@@ -203,8 +207,7 @@ export default function OrdersSupabase() {
     fragments.map((fragment, index) => {
       const fragmentNumber = fragment.fragmentNumber || index + 1;
       const fragmentId =
-        fragment.id ||
-        `${orderId}-frag-${fragmentNumber}-${Date.now()}`;
+        fragment.id || `${orderId}-frag-${fragmentNumber}-${Date.now()}`;
       return {
         id: fragmentId,
         order_id: orderId,
@@ -307,7 +310,7 @@ export default function OrdersSupabase() {
   // CORREÇÃO 2: Recarrega quando conectar e não tiver dados
   useEffect(() => {
     if (isConnected && orders.length === 0 && !loading) {
-      console.log('🔄 Reconectado ao Supabase, recarregando pedidos...');
+      console.log("🔄 Reconectado ao Supabase, recarregando pedidos...");
       loadOrders();
     }
   }, [isConnected]);
@@ -315,9 +318,9 @@ export default function OrdersSupabase() {
   const loadOrders = async () => {
     try {
       setLoading(true);
-      console.log('🔍 Buscando pedidos...', { isConnected });
+      console.log("🔍 Buscando pedidos...", { isConnected });
       const ordersData = await getOrders();
-      console.log('✅ Pedidos carregados:', ordersData.length, ordersData);
+      console.log("✅ Pedidos carregados:", ordersData.length, ordersData);
       setOrders(ordersData);
     } catch (error) {
       console.error("❌ Erro ao carregar pedidos:", error);
@@ -555,10 +558,10 @@ export default function OrdersSupabase() {
                   <div class="muted">${escapeHtml(
                     product.size || (product as any).size || "-",
                   )} • ${escapeHtml(
-              product.color || (product as any).color || "-",
-            )} • ${escapeHtml(
-              product.fabric || (product as any).fabric || "-",
-            )}</div>
+                    product.color || (product as any).color || "-",
+                  )} • ${escapeHtml(
+                    product.fabric || (product as any).fabric || "-",
+                  )}</div>
                 </td>
                 <td class="center">${toNumber(
                   product.quantity ?? (product as any).quantity,
@@ -654,8 +657,8 @@ export default function OrdersSupabase() {
       ? `<div class="summary-item">
             <label>Fragmentos</label>
             <span>${fragments.length} fragmento(s) · ${
-          fragmentTotals.quantity
-        } unidade(s)</span>
+              fragmentTotals.quantity
+            } unidade(s)</span>
           </div>`
       : "";
 
@@ -728,7 +731,9 @@ export default function OrdersSupabase() {
         <div class="info-card">
           <strong>Data de Entrega</strong>
           <span>${
-            order.delivery_date ? formatDate(order.delivery_date) : "Não definida"
+            order.delivery_date
+              ? formatDate(order.delivery_date)
+              : "Não definida"
           }</span>
         </div>
         <div class="info-card">
@@ -1241,7 +1246,9 @@ export default function OrdersSupabase() {
               <SelectValue placeholder="Todos os Status" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem key="all" value="all">Todos os Status</SelectItem>
+              <SelectItem key="all" value="all">
+                Todos os Status
+              </SelectItem>
               {Object.entries(statusLabels).map(([key, label]) => (
                 <SelectItem key={key} value={key}>
                   {label}
@@ -1258,7 +1265,9 @@ export default function OrdersSupabase() {
               <SelectValue placeholder="Todas as Prioridades" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem key="all" value="all">Todas as Prioridades</SelectItem>
+              <SelectItem key="all" value="all">
+                Todas as Prioridades
+              </SelectItem>
               {Object.entries(priorityLabels).map(([key, label]) => (
                 <SelectItem key={key} value={key}>
                   {label}
@@ -1361,7 +1370,10 @@ export default function OrdersSupabase() {
                                 <div className="font-medium flex items-center gap-2">
                                   {order.order_number}
                                   {order.is_fragmented && (
-                                    <Badge variant="outline" className="text-xs">
+                                    <Badge
+                                      variant="outline"
+                                      className="text-xs"
+                                    >
                                       Fragmentado
                                     </Badge>
                                   )}
@@ -1636,7 +1648,8 @@ export default function OrdersSupabase() {
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2 text-sm text-muted-foreground">
                               <span>
-                                Produção: {formatDate(fragment.scheduled_date as any)}
+                                Produção:{" "}
+                                {formatDate(fragment.scheduled_date as any)}
                               </span>
                               {fragment.value ? (
                                 <span>
@@ -1645,7 +1658,9 @@ export default function OrdersSupabase() {
                               ) : null}
                               <span>Progresso: {fragment.progress ?? 0}%</span>
                               {fragment.assigned_operator ? (
-                                <span>Operador: {fragment.assigned_operator}</span>
+                                <span>
+                                  Operador: {fragment.assigned_operator}
+                                </span>
                               ) : null}
                             </div>
                           </div>
