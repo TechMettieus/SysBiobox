@@ -105,6 +105,188 @@ export default function OrdersSupabase() {
   const { checkPermission } = useAuth();
   const { getOrders, createOrder, updateOrder, deleteOrder, isConnected } =
     useSupabase();
+  const { toast } = useToast();
+  const navigate = useNavigate();
+
+  const [showFragmentForm, setShowFragmentForm] = useState(false);
+  const [fragmentTarget, setFragmentTarget] = useState<Order | null>(null);
+  const [fragmentInitial, setFragmentInitial] = useState<UiOrderFragment[]>([]);
+
+  const toDate = (value: any, fallback: Date = new Date()): Date => {
+    if (!value) return fallback;
+    if (value instanceof Date) return value;
+    if (typeof value?.toDate === "function") {
+      try {
+        return value.toDate();
+      } catch {
+        return fallback;
+      }
+    }
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? fallback : parsed;
+  };
+
+  const toNumber = (value: any, fallback = 0): number => {
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return value;
+    }
+    if (typeof value === "string" && value.trim() !== "") {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : fallback;
+    }
+    if (typeof value === "object" && value !== null) {
+      const maybeValue = (value as any)?.toNumber?.();
+      if (typeof maybeValue === "number" && Number.isFinite(maybeValue)) {
+        return maybeValue;
+      }
+    }
+    return fallback;
+  };
+
+  const computeOrderTotalQuantity = (order: Order): number => {
+    if (order.total_quantity && order.total_quantity > 0) {
+      return order.total_quantity;
+    }
+    if (Array.isArray(order.products) && order.products.length > 0) {
+      return order.products.reduce(
+        (sum, product) => sum + toNumber((product as any).quantity),
+        0,
+      );
+    }
+    if (Array.isArray(order.fragments) && order.fragments.length > 0) {
+      return order.fragments.reduce(
+        (sum, fragment) => sum + toNumber(fragment.quantity),
+        0,
+      );
+    }
+    return 0;
+  };
+
+  const mapFragmentsToUi = (order: Order): UiOrderFragment[] => {
+    if (!Array.isArray(order.fragments)) return [];
+    return order.fragments.map((fragment) => ({
+      id: fragment.id,
+      orderId: fragment.order_id,
+      fragmentNumber: fragment.fragment_number,
+      quantity: toNumber(fragment.quantity),
+      scheduledDate: toDate(
+        fragment.scheduled_date,
+        toDate(order.scheduled_date),
+      ),
+      status: fragment.status,
+      progress: toNumber(fragment.progress),
+      value: toNumber(fragment.value),
+      assignedOperator: fragment.assigned_operator,
+      startedAt: fragment.started_at ? toDate(fragment.started_at) : undefined,
+      completedAt: fragment.completed_at
+        ? toDate(fragment.completed_at)
+        : undefined,
+    }));
+  };
+
+  const mapFragmentsToDb = (
+    orderId: string,
+    fragments: UiOrderFragment[],
+  ): DbOrderFragment[] =>
+    fragments.map((fragment, index) => {
+      const fragmentNumber = fragment.fragmentNumber || index + 1;
+      const fragmentId =
+        fragment.id ||
+        `${orderId}-frag-${fragmentNumber}-${Date.now()}`;
+      return {
+        id: fragmentId,
+        order_id: orderId,
+        fragment_number: fragmentNumber,
+        quantity: toNumber(fragment.quantity),
+        scheduled_date: fragment.scheduledDate.toISOString(),
+        status: fragment.status,
+        progress: toNumber(fragment.progress),
+        value: toNumber(fragment.value),
+        assigned_operator: fragment.assignedOperator,
+        started_at: fragment.startedAt
+          ? fragment.startedAt.toISOString()
+          : undefined,
+        completed_at: fragment.completedAt
+          ? fragment.completedAt.toISOString()
+          : undefined,
+      };
+    });
+
+  const resolveFragmentTotalQuantity = (
+    order: Order | null,
+    initialFragments: UiOrderFragment[],
+  ): number => {
+    if (!order) {
+      const fromInitial = initialFragments.reduce(
+        (sum, fragment) => sum + toNumber(fragment.quantity),
+        0,
+      );
+      return fromInitial > 0 ? fromInitial : 1;
+    }
+    const computed = computeOrderTotalQuantity(order);
+    if (computed > 0) return computed;
+    const fromInitial = initialFragments.reduce(
+      (sum, fragment) => sum + toNumber(fragment.quantity),
+      0,
+    );
+    return fromInitial > 0 ? fromInitial : 1;
+  };
+
+  const openFragmentForm = (order: Order) => {
+    setFragmentTarget(order);
+    setFragmentInitial(mapFragmentsToUi(order));
+    setShowFragmentForm(true);
+  };
+
+  const closeFragmentForm = () => {
+    setShowFragmentForm(false);
+    setFragmentTarget(null);
+    setFragmentInitial([]);
+  };
+
+  const handleSaveFragments = async (fragments: UiOrderFragment[]) => {
+    if (!fragmentTarget) return;
+    const fragmentsTotal = fragments.reduce(
+      (sum, fragment) => sum + toNumber(fragment.quantity),
+      0,
+    );
+    const effectiveTotal = (() => {
+      const baseTotal = computeOrderTotalQuantity(fragmentTarget);
+      if (baseTotal > 0) return baseTotal;
+      return fragmentsTotal > 0 ? fragmentsTotal : 1;
+    })();
+    const payload = mapFragmentsToDb(fragmentTarget.id, fragments);
+
+    try {
+      const updated = await updateOrder(fragmentTarget.id, {
+        fragments: payload as any,
+        is_fragmented: fragments.length > 0,
+        total_quantity: effectiveTotal,
+      });
+      if (updated) {
+        applyUpdate(updated);
+        toast({
+          title: "Fragmentação salva",
+          description: `Pedido ${updated.order_number} atualizado com ${fragments.length} fragmento(s).`,
+        });
+      } else {
+        toast({
+          title: "Não foi possível salvar a fragmentação",
+          description: "Tente novamente em instantes.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Erro ao salvar fragmentação:", error);
+      toast({
+        title: "Erro ao salvar fragmentação",
+        description: (error as Error).message,
+        variant: "destructive",
+      });
+    } finally {
+      closeFragmentForm();
+    }
+  };
 
   // CORREÇÃO 1: useEffect inicial
   useEffect(() => {
