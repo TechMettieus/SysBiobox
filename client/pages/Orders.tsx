@@ -87,6 +87,18 @@ const priorityColors = {
   urgent: "bg-red-100 text-red-800",
 };
 
+const fragmentStatusLabels = {
+  pending: "Pendente",
+  in_production: "Em Produção",
+  completed: "Concluído",
+};
+
+const fragmentStatusColors = {
+  pending: "bg-yellow-500/10 text-yellow-500 border-yellow-500/20",
+  in_production: "bg-purple-500/10 text-purple-500 border-purple-500/20",
+  completed: "bg-green-500/10 text-green-500 border-green-500/20",
+};
+
 export default function OrdersSupabase() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
