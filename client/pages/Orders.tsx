@@ -429,7 +429,16 @@ export default function OrdersSupabase() {
     const updates: Partial<Order> = { status: nextStatus };
     if (typeof progress === "number") updates.production_progress = progress;
     const updated = await updateOrder(order.id, updates);
-    if (updated) applyUpdate(updated);
+    if (updated) {
+      applyUpdate(updated);
+      if (nextStatus === "in_production") {
+        toast({
+          title: "Pedido enviado para produção",
+          description: `Pedido ${updated.order_number} agora está em produção.`,
+        });
+        navigate("/production");
+      }
+    }
   };
 
   const availableActions = (
