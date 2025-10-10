@@ -1206,7 +1206,7 @@ export default function OrdersSupabase() {
                       <strong>Entrega:</strong>{" "}
                       {selectedOrder.delivery_date
                         ? formatDate(selectedOrder.delivery_date)
-                        : "Não definida"}
+                        : "N��o definida"}
                     </p>
                   </div>
                 </div>
@@ -1323,6 +1323,20 @@ export default function OrdersSupabase() {
           onOpenChange={setShowNewOrderForm}
           onOrderCreated={handleOrderCreated}
         />
+
+        {showFragmentForm && fragmentTarget && (
+          <OrderFragmentForm
+            totalQuantity={Math.max(
+              1,
+              resolveFragmentTotalQuantity(fragmentTarget, fragmentInitial),
+            )}
+            totalValue={toNumber(fragmentTarget.total_amount)}
+            orderId={fragmentTarget.id}
+            initialFragments={fragmentInitial}
+            onSave={handleSaveFragments}
+            onCancel={closeFragmentForm}
+          />
+        )}
       </div>
     </DashboardLayout>
   );
