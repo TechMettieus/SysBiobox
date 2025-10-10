@@ -281,6 +281,7 @@ export default function OrdersSupabase() {
           title: "Fragmentação salva",
           description: `Pedido ${updated.order_number} atualizado com ${fragments.length} fragmento(s).`,
         });
+        closeFragmentForm();
       } else {
         toast({
           title: "Não foi possível salvar a fragmentação",
@@ -295,8 +296,6 @@ export default function OrdersSupabase() {
         description: (error as Error).message,
         variant: "destructive",
       });
-    } finally {
-      closeFragmentForm();
     }
   };
 
