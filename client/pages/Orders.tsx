@@ -1087,6 +1087,19 @@ export default function OrdersSupabase() {
                                     {action.label}
                                   </Button>
                                 ))}
+                              {checkPermission("orders", "edit") &&
+                                !["delivered", "cancelled"].includes(
+                                  order.status,
+                                ) && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => openFragmentForm(order)}
+                                  >
+                                    <Scissors className="h-4 w-4 mr-2" />
+                                    Fragmentar
+                                  </Button>
+                                )}
                               {checkPermission("orders", "edit") && (
                                 <Button variant="ghost" size="icon">
                                   <Edit className="h-4 w-4" />
