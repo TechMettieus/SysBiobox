@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import DashboardLayout from "@/components/DashboardLayout";
 import NewOrderForm from "@/components/NewOrderForm";
+import OrderFragmentForm from "@/components/OrderFragmentForm";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -44,9 +45,13 @@ import {
   Calendar,
   DollarSign,
   Trash2,
+  Scissors,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { useSupabase, Order } from "@/hooks/useSupabase";
+import { useSupabase, Order, OrderFragment as DbOrderFragment } from "@/hooks/useSupabase";
+import { useToast } from "@/components/ui/use-toast";
+import { useNavigate } from "react-router-dom";
+import { OrderFragment as UiOrderFragment } from "@/types/order";
 
 const statusLabels = {
   pending: "Pendente",
