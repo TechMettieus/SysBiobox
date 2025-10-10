@@ -519,6 +519,395 @@ export default function OrdersSupabase() {
     }).format(value);
   };
 
+  const escapeHtml = (value: any): string => {
+    if (value === null || value === undefined) return "";
+    return String(value)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  };
+
+  const formatDateTime = (value: any) =>
+    toDate(value).toLocaleString("pt-BR", {
+      dateStyle: "short",
+      timeStyle: "short",
+    });
+
+  const buildOrderPrintHtml = (order: Order): string => {
+    const products = Array.isArray(order.products) ? order.products : [];
+    const productRows = products.length
+      ? products
+          .map(
+            (product, index) => `
+              <tr>
+                <td>${index + 1}</td>
+                <td>
+                  <strong>${escapeHtml(
+                    product.product_name ||
+                      (product as any).productName ||
+                      "Produto",
+                  )}</strong>
+                  <div class="muted">${escapeHtml(
+                    product.model || (product as any).model || "-",
+                  )}</div>
+                  <div class="muted">${escapeHtml(
+                    product.size || (product as any).size || "-",
+                  )} • ${escapeHtml(
+              product.color || (product as any).color || "-",
+            )} • ${escapeHtml(
+              product.fabric || (product as any).fabric || "-",
+            )}</div>
+                </td>
+                <td class="center">${toNumber(
+                  product.quantity ?? (product as any).quantity,
+                )}</td>
+                <td class="right">${formatCurrency(
+                  toNumber(
+                    product.unit_price ?? (product as any).unitPrice ?? 0,
+                  ),
+                )}</td>
+                <td class="right">${formatCurrency(
+                  toNumber(
+                    product.total_price ?? (product as any).totalPrice ?? 0,
+                  ),
+                )}</td>
+              </tr>
+            `,
+          )
+          .join("")
+      : `<tr><td colspan="5" class="empty">Nenhum item cadastrado.</td></tr>`;
+
+    const fragments = Array.isArray(order.fragments) ? order.fragments : [];
+    const fragmentRows = fragments.length
+      ? fragments
+          .map(
+            (fragment, index) => `
+              <tr>
+                <td>${index + 1}</td>
+                <td>${toNumber(fragment.fragment_number)}</td>
+                <td>${toNumber(fragment.quantity)}</td>
+                <td>${formatDate(fragment.scheduled_date as any)}</td>
+                <td>${fragmentStatusLabels[fragment.status]}</td>
+                <td>${formatCurrency(fragment.value || 0)}</td>
+                <td>${toNumber(fragment.progress)}%</td>
+                <td>${escapeHtml(fragment.assigned_operator || "-")}</td>
+              </tr>
+            `,
+          )
+          .join("")
+      : "";
+
+    const fragmentsSection = fragments.length
+      ? `
+        <div class="section">
+          <h2>Fragmentação</h2>
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Fragmento</th>
+                <th>Qtd.</th>
+                <th>Agendamento</th>
+                <th>Status</th>
+                <th>Valor</th>
+                <th>Progresso</th>
+                <th>Responsável</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${fragmentRows}
+            </tbody>
+          </table>
+        </div>
+      `
+      : "";
+
+    const notesSection = order.notes
+      ? `
+        <div class="section">
+          <h2>Observações</h2>
+          <p>${escapeHtml(order.notes)}</p>
+        </div>
+      `
+      : "";
+
+    const fragmentTotals = fragments.reduce(
+      (acc, fragment) => ({
+        quantity: acc.quantity + toNumber(fragment.quantity),
+        value: acc.value + toNumber(fragment.value),
+      }),
+      { quantity: 0, value: 0 },
+    );
+
+    const totalQuantity =
+      computeOrderTotalQuantity(order) ||
+      fragmentTotals.quantity ||
+      products.reduce(
+        (sum, product) =>
+          sum + toNumber(product.quantity ?? (product as any).quantity),
+        0,
+      );
+
+    const fragmentSummaryBlock = fragments.length
+      ? `<div class="summary-item">
+            <label>Fragmentos</label>
+            <span>${fragments.length} fragmento(s) · ${
+          fragmentTotals.quantity
+        } unidade(s)</span>
+          </div>`
+      : "";
+
+    const printedAt = formatDateTime(new Date());
+
+    return `<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Pedido ${escapeHtml(order.order_number)}</title>
+    <style>
+      * { box-sizing: border-box; }
+      body { font-family: 'Inter', Arial, sans-serif; background: #0f172a0d; color: #0f172a; margin: 0; padding: 32px; }
+      .card { background: #ffffff; border-radius: 16px; padding: 32px; margin: 0 auto; max-width: 960px; box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.25); }
+      h1 { margin: 0 0 24px; font-size: 28px; color: #0f172a; }
+      h2 { margin: 0 0 16px; font-size: 18px; color: #0f172a; }
+      .muted { color: #64748b; font-size: 12px; }
+      .grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+      .info-card { background: #f8fafc; border-radius: 12px; padding: 16px; border: 1px solid #e2e8f0; }
+      .info-card strong { display: block; font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: #475569; margin-bottom: 4px; }
+      .info-card span { font-size: 14px; font-weight: 600; color: #0f172a; }
+      .data-table { width: 100%; border-collapse: collapse; }
+      .data-table thead th { text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: #475569; padding: 12px 16px; background: #f1f5f9; border-bottom: 1px solid #e2e8f0; }
+      .data-table tbody td { padding: 12px 16px; border-bottom: 1px solid #e2e8f0; font-size: 14px; vertical-align: top; }
+      .data-table tbody tr:last-child td { border-bottom: none; }
+      .data-table td.center { text-align: center; }
+      .data-table td.right { text-align: right; }
+      .empty { text-align: center; padding: 24px !important; color: #64748b; font-style: italic; }
+      .section { margin-top: 32px; }
+      .summary { margin-top: 24px; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 16px; background: #f8fafc; border-radius: 12px; padding: 16px; border: 1px solid #e2e8f0; }
+      .summary-item { min-width: 180px; }
+      .summary-item label { display: block; font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: #475569; margin-bottom: 4px; }
+      .summary-item span { font-size: 16px; font-weight: 700; color: #0f172a; }
+      footer { margin-top: 32px; display: flex; justify-content: space-between; font-size: 12px; color: #94a3b8; }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <header>
+        <h1>Resumo do Pedido ${escapeHtml(order.order_number)}</h1>
+        <div class="muted">Gerado em ${printedAt}</div>
+      </header>
+
+      <div class="grid">
+        <div class="info-card">
+          <strong>Cliente</strong>
+          <span>${escapeHtml(order.customer_name || "Cliente não informado")}</span>
+          <div class="muted">${escapeHtml(order.customer_email || "Sem e-mail")}</div>
+          <div class="muted">${escapeHtml(order.customer_phone || "Sem telefone")}</div>
+        </div>
+        <div class="info-card">
+          <strong>Vendedor</strong>
+          <span>${escapeHtml(order.seller_name || "Não atribuído")}</span>
+        </div>
+        <div class="info-card">
+          <strong>Status</strong>
+          <span>${statusLabels[order.status]}</span>
+        </div>
+        <div class="info-card">
+          <strong>Prioridade</strong>
+          <span>${priorityLabels[order.priority]}</span>
+        </div>
+      </div>
+
+      <div class="grid" style="margin-top: 16px;">
+        <div class="info-card">
+          <strong>Data de Produção</strong>
+          <span>${formatDate(order.scheduled_date)}</span>
+        </div>
+        <div class="info-card">
+          <strong>Data de Entrega</strong>
+          <span>${
+            order.delivery_date ? formatDate(order.delivery_date) : "Não definida"
+          }</span>
+        </div>
+        <div class="info-card">
+          <strong>Progresso</strong>
+          <span>${order.production_progress}% concluído</span>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>Itens do Pedido</h2>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Produto</th>
+              <th>Qtd.</th>
+              <th>Valor Unit.</th>
+              <th>Subtotal</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${productRows}
+          </tbody>
+        </table>
+      </div>
+
+      ${fragmentsSection}
+      ${notesSection}
+
+      <div class="summary">
+        <div class="summary-item">
+          <label>Valor Total</label>
+          <span>${formatCurrency(order.total_amount || 0)}</span>
+        </div>
+        <div class="summary-item">
+          <label>Quantidade Total</label>
+          <span>${totalQuantity || "-"}</span>
+        </div>
+        ${fragmentSummaryBlock}
+      </div>
+
+      <footer>
+        <span>BioBoxsys • Sistema de Gestão de Produção</span>
+        <span>Impresso em ${printedAt}</span>
+      </footer>
+    </div>
+    <script>
+      window.onload = function() {
+        window.print();
+        setTimeout(function() { window.close(); }, 250);
+      };
+    </script>
+  </body>
+</html>`;
+  };
+
+  const buildOrdersListPrintHtml = (ordersList: Order[]): string => {
+    const printedAt = formatDateTime(new Date());
+    const rows = ordersList.length
+      ? ordersList
+          .map(
+            (order, index) => `
+              <tr>
+                <td>${index + 1}</td>
+                <td>${escapeHtml(order.order_number)}</td>
+                <td>
+                  <strong>${escapeHtml(order.customer_name || "-")}</strong>
+                  <div class="muted">${escapeHtml(order.customer_phone || "-")}</div>
+                </td>
+                <td>${statusLabels[order.status]}</td>
+                <td>${priorityLabels[order.priority]}</td>
+                <td>${formatDate(order.delivery_date || order.scheduled_date)}</td>
+                <td class="right">${formatCurrency(order.total_amount || 0)}</td>
+                <td class="center">${order.production_progress}%</td>
+              </tr>
+            `,
+          )
+          .join("")
+      : `<tr><td colspan="8" class="empty">Nenhum pedido no filtro atual.</td></tr>`;
+
+    const totals = ordersList.reduce(
+      (acc, order) => {
+        acc.value += order.total_amount || 0;
+        acc.status[order.status] = (acc.status[order.status] || 0) + 1;
+        return acc;
+      },
+      { value: 0, status: {} as Record<Order["status"], number> },
+    );
+
+    const summaryCards = [
+      { label: "Total de Pedidos", value: String(ordersList.length) },
+      {
+        label: "Em Produção",
+        value: String(totals.status["in_production"] || 0),
+      },
+      { label: "Pendentes", value: String(totals.status["pending"] || 0) },
+      { label: "Prontos", value: String(totals.status["ready"] || 0) },
+      { label: "Entregues", value: String(totals.status["delivered"] || 0) },
+      { label: "Valor Total", value: formatCurrency(totals.value) },
+    ]
+      .map(
+        (card) => `
+        <div class="summary-card">
+          <span>${card.label}</span>
+          <strong>${escapeHtml(card.value)}</strong>
+        </div>
+      `,
+      )
+      .join("");
+
+    return `<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Lista de Pedidos</title>
+    <style>
+      * { box-sizing: border-box; }
+      body { font-family: 'Inter', Arial, sans-serif; background: #0f172a0d; color: #0f172a; margin: 0; padding: 32px; }
+      .card { background: #ffffff; border-radius: 16px; padding: 32px; margin: 0 auto; max-width: 1100px; box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.25); }
+      h1 { margin: 0 0 24px; font-size: 28px; color: #0f172a; }
+      .muted { color: #64748b; font-size: 12px; }
+      .summary-grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin-bottom: 24px; }
+      .summary-card { background: #f8fafc; border-radius: 12px; padding: 16px; border: 1px solid #e2e8f0; }
+      .summary-card span { display: block; font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: #475569; margin-bottom: 8px; }
+      .summary-card strong { font-size: 20px; color: #0f172a; }
+      table { width: 100%; border-collapse: collapse; }
+      thead th { text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: #475569; padding: 12px 16px; background: #f1f5f9; border-bottom: 1px solid #e2e8f0; }
+      tbody td { padding: 12px 16px; border-bottom: 1px solid #e2e8f0; font-size: 14px; vertical-align: top; }
+      tbody td.center { text-align: center; }
+      tbody td.right { text-align: right; }
+      tbody tr:last-child td { border-bottom: none; }
+      .empty { text-align: center; padding: 24px !important; color: #64748b; font-style: italic; }
+      footer { margin-top: 32px; display: flex; justify-content: space-between; font-size: 12px; color: #94a3b8; }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <header>
+        <h1>Lista de Pedidos</h1>
+        <div class="muted">Gerado em ${printedAt}</div>
+      </header>
+
+      <div class="summary-grid">
+        ${summaryCards}
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Pedido</th>
+            <th>Cliente</th>
+            <th>Status</th>
+            <th>Prioridade</th>
+            <th>Entrega</th>
+            <th>Valor</th>
+            <th>Progresso</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows}
+        </tbody>
+      </table>
+
+      <footer>
+        <span>BioBoxsys • Sistema de Gestão de Produção</span>
+        <span>Impresso em ${printedAt}</span>
+      </footer>
+    </div>
+    <script>
+      window.onload = function() {
+        window.print();
+        setTimeout(function() { window.close(); }, 250);
+      };
+    </script>
+  </body>
+</html>`;
+  };
+
   const getDaysUntilDelivery = (deliveryDate?: string) => {
     if (!deliveryDate) return null;
     const today = new Date();
