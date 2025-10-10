@@ -509,8 +509,8 @@ export default function OrdersSupabase() {
     return actions;
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("pt-BR");
+  const formatDate = (value: any) => {
+    return toDate(value).toLocaleDateString("pt-BR");
   };
 
   const formatCurrency = (value: number) => {
@@ -1206,7 +1206,7 @@ export default function OrdersSupabase() {
                       <strong>Entrega:</strong>{" "}
                       {selectedOrder.delivery_date
                         ? formatDate(selectedOrder.delivery_date)
-                        : "N��o definida"}
+                        : "Não definida"}
                     </p>
                   </div>
                 </div>
