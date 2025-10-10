@@ -1,20 +1,23 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
-import { 
-  Calendar as CalendarIcon, 
-  Package, 
+import {
+  Calendar as CalendarIcon,
+  Package,
   DollarSign,
-  Clock,
   Plus,
   Minus,
   Save,
-  X
+  X,
 } from "lucide-react";
 import { OrderFragment as OrderFragmentType } from "@/types/order";
 import { format, addDays } from "date-fns";
@@ -26,57 +29,86 @@ interface OrderFragmentFormProps {
   totalValue: number;
   onSave: (fragments: OrderFragmentType[]) => void;
   onCancel: () => void;
+  orderId?: string;
+  initialFragments?: OrderFragmentType[];
 }
 
 export default function OrderFragmentForm({
   totalQuantity,
   totalValue,
   onSave,
-  onCancel
+  onCancel,
+  orderId,
+  initialFragments = [],
 }: OrderFragmentFormProps) {
-  const [fragments, setFragments] = useState<Partial<OrderFragmentType>[]>([
-    {
-      fragmentNumber: 1,
-      quantity: Math.ceil(totalQuantity / 4),
-      scheduledDate: new Date(),
-      status: 'pending',
-      progress: 0
-    }
-  ]);
+  const [fragments, setFragments] = useState<Partial<OrderFragmentType>[]>(
+    () =>
+      initialFragments.length > 0
+        ? initialFragments.map((fragment) => ({
+            ...fragment,
+            scheduledDate: fragment.scheduledDate
+              ? new Date(fragment.scheduledDate)
+              : new Date(),
+          }))
+        : [
+            {
+              fragmentNumber: 1,
+              quantity: Math.max(1, Math.ceil(totalQuantity / 4)),
+              scheduledDate: new Date(),
+              status: "pending",
+              progress: 0,
+            },
+          ],
+  );
   const [showCalendar, setShowCalendar] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (initialFragments.length > 0) {
+      setFragments(
+        initialFragments.map((fragment) => ({
+          ...fragment,
+          scheduledDate: fragment.scheduledDate
+            ? new Date(fragment.scheduledDate)
+            : new Date(),
+        })),
+      );
+    }
+  }, [initialFragments]);
 
   const addFragment = () => {
     const lastFragment = fragments[fragments.length - 1];
-    const nextDate = lastFragment?.scheduledDate 
+    const nextDate = lastFragment?.scheduledDate
       ? addDays(lastFragment.scheduledDate, 1)
       : new Date();
 
-    setFragments(prev => [
+    setFragments((prev) => [
       ...prev,
       {
         fragmentNumber: prev.length + 1,
         quantity: 1,
         scheduledDate: nextDate,
-        status: 'pending',
-        progress: 0
-      }
+        status: "pending",
+        progress: 0,
+      },
     ]);
   };
 
   const removeFragment = (index: number) => {
     if (fragments.length > 1) {
-      setFragments(prev => prev.filter((_, i) => i !== index));
+      setFragments((prev) => prev.filter((_, i) => i !== index));
     }
   };
 
   const updateFragment = (index: number, field: string, value: any) => {
-    setFragments(prev => prev.map((fragment, i) => 
-      i === index ? { ...fragment, [field]: value } : fragment
-    ));
+    setFragments((prev) =>
+      prev.map((fragment, i) =>
+        i === index ? { ...fragment, [field]: value } : fragment,
+      ),
+    );
   };
 
   const updateFragmentDate = (index: number, date: Date) => {
-    updateFragment(index, 'scheduledDate', date);
+    updateFragment(index, "scheduledDate", date);
     setShowCalendar(null);
   };
 
@@ -85,42 +117,57 @@ export default function OrderFragmentForm({
   };
 
   const getTotalFragmentQuantity = () => {
-    return fragments.reduce((sum, fragment) => sum + (fragment.quantity || 0), 0);
+    return fragments.reduce(
+      (sum, fragment) => sum + (fragment.quantity || 0),
+      0,
+    );
   };
 
   const getTotalFragmentValue = () => {
-    return fragments.reduce((sum, fragment) => 
-      sum + calculateFragmentValue(fragment.quantity || 0), 0
+    return fragments.reduce(
+      (sum, fragment) => sum + calculateFragmentValue(fragment.quantity || 0),
+      0,
     );
   };
 
   const isValid = () => {
-    return getTotalFragmentQuantity() === totalQuantity &&
-           fragments.every(f => f.quantity && f.quantity > 0 && f.scheduledDate);
+    return (
+      getTotalFragmentQuantity() === totalQuantity &&
+      fragments.every((f) => f.quantity && f.quantity > 0 && f.scheduledDate)
+    );
   };
 
   const handleSave = () => {
     if (!isValid()) return;
 
-    const orderId = Date.now().toString();
-    const completeFragments: OrderFragmentType[] = fragments.map((fragment, index) => ({
-      id: `${orderId}-frag-${index + 1}`,
-      orderId,
-      fragmentNumber: fragment.fragmentNumber!,
-      quantity: fragment.quantity!,
-      scheduledDate: fragment.scheduledDate!,
-      status: fragment.status!,
-      progress: fragment.progress!,
-      value: calculateFragmentValue(fragment.quantity!)
-    }));
+    const baseOrderId =
+      orderId || initialFragments[0]?.orderId || Date.now().toString();
+
+    const completeFragments: OrderFragmentType[] = fragments.map(
+      (fragment, index) => ({
+        id:
+          fragment.id ||
+          `${baseOrderId}-frag-${fragment.fragmentNumber || index + 1}-${Date.now()}`,
+        orderId: baseOrderId,
+        fragmentNumber: fragment.fragmentNumber || index + 1,
+        quantity: fragment.quantity || 0,
+        scheduledDate: fragment.scheduledDate || new Date(),
+        status: fragment.status || "pending",
+        progress: fragment.progress ?? 0,
+        value: calculateFragmentValue(fragment.quantity || 0),
+        assignedOperator: fragment.assignedOperator,
+        startedAt: fragment.startedAt,
+        completedAt: fragment.completedAt,
+      }),
+    );
 
     onSave(completeFragments);
   };
 
   const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL'
+    return new Intl.NumberFormat("pt-BR", {
+      style: "currency",
+      currency: "BRL",
     }).format(value);
   };
 
@@ -179,7 +226,9 @@ export default function OrderFragmentForm({
               <Card key={index} className="bg-muted/5 border-dashed">
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between mb-3">
-                    <h4 className="font-medium">Fragmento {fragment.fragmentNumber}</h4>
+                    <h4 className="font-medium">
+                      Fragmento {fragment.fragmentNumber}
+                    </h4>
                     {fragments.length > 1 && (
                       <Button
                         type="button"
@@ -199,31 +248,45 @@ export default function OrderFragmentForm({
                         type="number"
                         min="1"
                         max={totalQuantity}
-                        value={fragment.quantity || ''}
-                        onChange={(e) => updateFragment(index, 'quantity', parseInt(e.target.value) || 0)}
+                        value={fragment.quantity || ""}
+                        onChange={(e) =>
+                          updateFragment(
+                            index,
+                            "quantity",
+                            parseInt(e.target.value) || 0,
+                          )
+                        }
                         placeholder="Qtd"
                       />
                     </div>
                     <div>
                       <Label>Data de Produção</Label>
-                      <Popover 
-                        open={showCalendar === index} 
-                        onOpenChange={(open) => setShowCalendar(open ? index : null)}
+                      <Popover
+                        open={showCalendar === index}
+                        onOpenChange={(open) =>
+                          setShowCalendar(open ? index : null)
+                        }
                       >
                         <PopoverTrigger asChild>
-                          <Button variant="outline" className="w-full justify-start text-left font-normal">
+                          <Button
+                            variant="outline"
+                            className="w-full justify-start text-left font-normal"
+                          >
                             <CalendarIcon className="mr-2 h-4 w-4" />
-                            {fragment.scheduledDate 
-                              ? format(fragment.scheduledDate, "dd/MM/yyyy", { locale: ptBR })
-                              : "Selecionar data"
-                            }
+                            {fragment.scheduledDate
+                              ? format(fragment.scheduledDate, "dd/MM/yyyy", {
+                                  locale: ptBR,
+                                })
+                              : "Selecionar data"}
                           </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-auto p-0" align="start">
                           <Calendar
                             mode="single"
                             selected={fragment.scheduledDate}
-                            onSelect={(date) => date && updateFragmentDate(index, date)}
+                            onSelect={(date) =>
+                              date && updateFragmentDate(index, date)
+                            }
                             initialFocus
                           />
                         </PopoverContent>
@@ -234,7 +297,9 @@ export default function OrderFragmentForm({
                       <div className="flex items-center h-10 px-3 py-2 border border-input rounded-md bg-muted/5">
                         <DollarSign className="h-4 w-4 mr-2 text-muted-foreground" />
                         <span className="text-sm font-medium">
-                          {formatCurrency(calculateFragmentValue(fragment.quantity || 0))}
+                          {formatCurrency(
+                            calculateFragmentValue(fragment.quantity || 0),
+                          )}
                         </span>
                       </div>
                     </div>
@@ -248,12 +313,12 @@ export default function OrderFragmentForm({
           <div className="p-4 border border-border rounded-lg">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm font-medium">Validação</span>
-              <Badge 
+              <Badge
                 variant="outline"
                 className={cn(
-                  isValid() 
+                  isValid()
                     ? "bg-biobox-green/10 text-biobox-green border-biobox-green/20"
-                    : "bg-red-500/10 text-red-500 border-red-500/20"
+                    : "bg-red-500/10 text-red-500 border-red-500/20",
                 )}
               >
                 {isValid() ? "Válido" : "Inválido"}
@@ -262,21 +327,28 @@ export default function OrderFragmentForm({
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div className="flex justify-between">
                 <span>Quantidade Total:</span>
-                <span className={cn(
-                  "font-medium",
-                  quantityDifference === 0 ? "text-biobox-green" : "text-red-500"
-                )}>
+                <span
+                  className={cn(
+                    "font-medium",
+                    quantityDifference === 0
+                      ? "text-biobox-green"
+                      : "text-red-500",
+                  )}
+                >
                   {getTotalFragmentQuantity()} / {totalQuantity}
                   {quantityDifference !== 0 && (
                     <span className="ml-1">
-                      ({quantityDifference > 0 ? '+' : ''}{quantityDifference})
+                      ({quantityDifference > 0 ? "+" : ""}
+                      {quantityDifference})
                     </span>
                   )}
                 </span>
               </div>
               <div className="flex justify-between">
                 <span>Valor Total:</span>
-                <span className="font-medium">{formatCurrency(getTotalFragmentValue())}</span>
+                <span className="font-medium">
+                  {formatCurrency(getTotalFragmentValue())}
+                </span>
               </div>
             </div>
           </div>
@@ -285,7 +357,7 @@ export default function OrderFragmentForm({
             <Button type="button" variant="outline" onClick={onCancel}>
               Cancelar
             </Button>
-            <Button 
+            <Button
               onClick={handleSave}
               disabled={!isValid()}
               className="bg-biobox-green hover:bg-biobox-green-dark"

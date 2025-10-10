@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import DashboardLayout from "@/components/DashboardLayout";
 import NewOrderForm from "@/components/NewOrderForm";
+import OrderFragmentForm from "@/components/OrderFragmentForm";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -44,9 +45,17 @@ import {
   Calendar,
   DollarSign,
   Trash2,
+  Scissors,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { useSupabase, Order } from "@/hooks/useSupabase";
+import {
+  useSupabase,
+  Order,
+  OrderFragment as DbOrderFragment,
+} from "@/hooks/useSupabase";
+import { useToast } from "@/components/ui/use-toast";
+import { useNavigate } from "react-router-dom";
+import { OrderFragment as UiOrderFragment } from "@/types/order";
 
 const statusLabels = {
   pending: "Pendente",
@@ -82,6 +91,18 @@ const priorityColors = {
   urgent: "bg-red-100 text-red-800",
 };
 
+const fragmentStatusLabels = {
+  pending: "Pendente",
+  in_production: "Em Produção",
+  completed: "Concluído",
+};
+
+const fragmentStatusColors = {
+  pending: "bg-yellow-500/10 text-yellow-500 border-yellow-500/20",
+  in_production: "bg-purple-500/10 text-purple-500 border-purple-500/20",
+  completed: "bg-green-500/10 text-green-500 border-green-500/20",
+};
+
 export default function OrdersSupabase() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -100,6 +121,186 @@ export default function OrdersSupabase() {
   const { checkPermission } = useAuth();
   const { getOrders, createOrder, updateOrder, deleteOrder, isConnected } =
     useSupabase();
+  const { toast } = useToast();
+  const navigate = useNavigate();
+
+  const [showFragmentForm, setShowFragmentForm] = useState(false);
+  const [fragmentTarget, setFragmentTarget] = useState<Order | null>(null);
+  const [fragmentInitial, setFragmentInitial] = useState<UiOrderFragment[]>([]);
+
+  const toDate = (value: any, fallback: Date = new Date()): Date => {
+    if (!value) return fallback;
+    if (value instanceof Date) return value;
+    if (typeof value?.toDate === "function") {
+      try {
+        return value.toDate();
+      } catch {
+        return fallback;
+      }
+    }
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? fallback : parsed;
+  };
+
+  const toNumber = (value: any, fallback = 0): number => {
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return value;
+    }
+    if (typeof value === "string" && value.trim() !== "") {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : fallback;
+    }
+    if (typeof value === "object" && value !== null) {
+      const maybeValue = (value as any)?.toNumber?.();
+      if (typeof maybeValue === "number" && Number.isFinite(maybeValue)) {
+        return maybeValue;
+      }
+    }
+    return fallback;
+  };
+
+  const computeOrderTotalQuantity = (order: Order): number => {
+    if (order.total_quantity && order.total_quantity > 0) {
+      return order.total_quantity;
+    }
+    if (Array.isArray(order.products) && order.products.length > 0) {
+      return order.products.reduce(
+        (sum, product) => sum + toNumber((product as any).quantity),
+        0,
+      );
+    }
+    if (Array.isArray(order.fragments) && order.fragments.length > 0) {
+      return order.fragments.reduce(
+        (sum, fragment) => sum + toNumber(fragment.quantity),
+        0,
+      );
+    }
+    return 0;
+  };
+
+  const mapFragmentsToUi = (order: Order): UiOrderFragment[] => {
+    if (!Array.isArray(order.fragments)) return [];
+    return order.fragments.map((fragment) => ({
+      id: fragment.id,
+      orderId: fragment.order_id,
+      fragmentNumber: fragment.fragment_number,
+      quantity: toNumber(fragment.quantity),
+      scheduledDate: toDate(
+        fragment.scheduled_date,
+        toDate(order.scheduled_date),
+      ),
+      status: fragment.status,
+      progress: toNumber(fragment.progress),
+      value: toNumber(fragment.value),
+      assignedOperator: fragment.assigned_operator,
+      startedAt: fragment.started_at ? toDate(fragment.started_at) : undefined,
+      completedAt: fragment.completed_at
+        ? toDate(fragment.completed_at)
+        : undefined,
+    }));
+  };
+
+  const mapFragmentsToDb = (
+    orderId: string,
+    fragments: UiOrderFragment[],
+  ): DbOrderFragment[] =>
+    fragments.map((fragment, index) => {
+      const fragmentNumber = fragment.fragmentNumber || index + 1;
+      const fragmentId =
+        fragment.id || `${orderId}-frag-${fragmentNumber}-${Date.now()}`;
+      return {
+        id: fragmentId,
+        order_id: orderId,
+        fragment_number: fragmentNumber,
+        quantity: toNumber(fragment.quantity),
+        scheduled_date: fragment.scheduledDate.toISOString(),
+        status: fragment.status,
+        progress: toNumber(fragment.progress),
+        value: toNumber(fragment.value),
+        assigned_operator: fragment.assignedOperator,
+        started_at: fragment.startedAt
+          ? fragment.startedAt.toISOString()
+          : undefined,
+        completed_at: fragment.completedAt
+          ? fragment.completedAt.toISOString()
+          : undefined,
+      };
+    });
+
+  const resolveFragmentTotalQuantity = (
+    order: Order | null,
+    initialFragments: UiOrderFragment[],
+  ): number => {
+    if (!order) {
+      const fromInitial = initialFragments.reduce(
+        (sum, fragment) => sum + toNumber(fragment.quantity),
+        0,
+      );
+      return fromInitial > 0 ? fromInitial : 1;
+    }
+    const computed = computeOrderTotalQuantity(order);
+    if (computed > 0) return computed;
+    const fromInitial = initialFragments.reduce(
+      (sum, fragment) => sum + toNumber(fragment.quantity),
+      0,
+    );
+    return fromInitial > 0 ? fromInitial : 1;
+  };
+
+  const openFragmentForm = (order: Order) => {
+    setFragmentTarget(order);
+    setFragmentInitial(mapFragmentsToUi(order));
+    setShowFragmentForm(true);
+  };
+
+  const closeFragmentForm = () => {
+    setShowFragmentForm(false);
+    setFragmentTarget(null);
+    setFragmentInitial([]);
+  };
+
+  const handleSaveFragments = async (fragments: UiOrderFragment[]) => {
+    if (!fragmentTarget) return;
+    const fragmentsTotal = fragments.reduce(
+      (sum, fragment) => sum + toNumber(fragment.quantity),
+      0,
+    );
+    const effectiveTotal = (() => {
+      const baseTotal = computeOrderTotalQuantity(fragmentTarget);
+      if (baseTotal > 0) return baseTotal;
+      return fragmentsTotal > 0 ? fragmentsTotal : 1;
+    })();
+    const payload = mapFragmentsToDb(fragmentTarget.id, fragments);
+
+    try {
+      const updated = await updateOrder(fragmentTarget.id, {
+        fragments: payload as any,
+        is_fragmented: fragments.length > 0,
+        total_quantity: effectiveTotal,
+      });
+      if (updated) {
+        applyUpdate(updated);
+        toast({
+          title: "Fragmentação salva",
+          description: `Pedido ${updated.order_number} atualizado com ${fragments.length} fragmento(s).`,
+        });
+        closeFragmentForm();
+      } else {
+        toast({
+          title: "Não foi possível salvar a fragmentação",
+          description: "Tente novamente em instantes.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Erro ao salvar fragmentação:", error);
+      toast({
+        title: "Erro ao salvar fragmentação",
+        description: (error as Error).message,
+        variant: "destructive",
+      });
+    }
+  };
 
   // CORREÇÃO 1: useEffect inicial
   useEffect(() => {
@@ -109,7 +310,7 @@ export default function OrdersSupabase() {
   // CORREÇÃO 2: Recarrega quando conectar e não tiver dados
   useEffect(() => {
     if (isConnected && orders.length === 0 && !loading) {
-      console.log('🔄 Reconectado ao Supabase, recarregando pedidos...');
+      console.log("🔄 Reconectado ao Supabase, recarregando pedidos...");
       loadOrders();
     }
   }, [isConnected]);
@@ -117,9 +318,9 @@ export default function OrdersSupabase() {
   const loadOrders = async () => {
     try {
       setLoading(true);
-      console.log('🔍 Buscando pedidos...', { isConnected });
+      console.log("🔍 Buscando pedidos...", { isConnected });
       const ordersData = await getOrders();
-      console.log('✅ Pedidos carregados:', ordersData.length, ordersData);
+      console.log("✅ Pedidos carregados:", ordersData.length, ordersData);
       setOrders(ordersData);
     } catch (error) {
       console.error("❌ Erro ao carregar pedidos:", error);
@@ -230,7 +431,16 @@ export default function OrdersSupabase() {
     const updates: Partial<Order> = { status: nextStatus };
     if (typeof progress === "number") updates.production_progress = progress;
     const updated = await updateOrder(order.id, updates);
-    if (updated) applyUpdate(updated);
+    if (updated) {
+      applyUpdate(updated);
+      if (nextStatus === "in_production") {
+        toast({
+          title: "Pedido enviado para produção",
+          description: `Pedido ${updated.order_number} agora está em produção.`,
+        });
+        navigate("/production");
+      }
+    }
   };
 
   const availableActions = (
@@ -301,8 +511,8 @@ export default function OrdersSupabase() {
     return actions;
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("pt-BR");
+  const formatDate = (value: any) => {
+    return toDate(value).toLocaleDateString("pt-BR");
   };
 
   const formatCurrency = (value: number) => {
@@ -310,6 +520,397 @@ export default function OrdersSupabase() {
       style: "currency",
       currency: "BRL",
     }).format(value);
+  };
+
+  const escapeHtml = (value: any): string => {
+    if (value === null || value === undefined) return "";
+    return String(value)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  };
+
+  const formatDateTime = (value: any) =>
+    toDate(value).toLocaleString("pt-BR", {
+      dateStyle: "short",
+      timeStyle: "short",
+    });
+
+  const buildOrderPrintHtml = (order: Order): string => {
+    const products = Array.isArray(order.products) ? order.products : [];
+    const productRows = products.length
+      ? products
+          .map(
+            (product, index) => `
+              <tr>
+                <td>${index + 1}</td>
+                <td>
+                  <strong>${escapeHtml(
+                    product.product_name ||
+                      (product as any).productName ||
+                      "Produto",
+                  )}</strong>
+                  <div class="muted">${escapeHtml(
+                    product.model || (product as any).model || "-",
+                  )}</div>
+                  <div class="muted">${escapeHtml(
+                    product.size || (product as any).size || "-",
+                  )} • ${escapeHtml(
+                    product.color || (product as any).color || "-",
+                  )} • ${escapeHtml(
+                    product.fabric || (product as any).fabric || "-",
+                  )}</div>
+                </td>
+                <td class="center">${toNumber(
+                  product.quantity ?? (product as any).quantity,
+                )}</td>
+                <td class="right">${formatCurrency(
+                  toNumber(
+                    product.unit_price ?? (product as any).unitPrice ?? 0,
+                  ),
+                )}</td>
+                <td class="right">${formatCurrency(
+                  toNumber(
+                    product.total_price ?? (product as any).totalPrice ?? 0,
+                  ),
+                )}</td>
+              </tr>
+            `,
+          )
+          .join("")
+      : `<tr><td colspan="5" class="empty">Nenhum item cadastrado.</td></tr>`;
+
+    const fragments = Array.isArray(order.fragments) ? order.fragments : [];
+    const fragmentRows = fragments.length
+      ? fragments
+          .map(
+            (fragment, index) => `
+              <tr>
+                <td>${index + 1}</td>
+                <td>${toNumber(fragment.fragment_number)}</td>
+                <td>${toNumber(fragment.quantity)}</td>
+                <td>${formatDate(fragment.scheduled_date as any)}</td>
+                <td>${fragmentStatusLabels[fragment.status]}</td>
+                <td>${formatCurrency(fragment.value || 0)}</td>
+                <td>${toNumber(fragment.progress)}%</td>
+                <td>${escapeHtml(fragment.assigned_operator || "-")}</td>
+              </tr>
+            `,
+          )
+          .join("")
+      : "";
+
+    const fragmentsSection = fragments.length
+      ? `
+        <div class="section">
+          <h2>Fragmentação</h2>
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Fragmento</th>
+                <th>Qtd.</th>
+                <th>Agendamento</th>
+                <th>Status</th>
+                <th>Valor</th>
+                <th>Progresso</th>
+                <th>Responsável</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${fragmentRows}
+            </tbody>
+          </table>
+        </div>
+      `
+      : "";
+
+    const notesSection = order.notes
+      ? `
+        <div class="section">
+          <h2>Observações</h2>
+          <p>${escapeHtml(order.notes)}</p>
+        </div>
+      `
+      : "";
+
+    const fragmentTotals = fragments.reduce(
+      (acc, fragment) => ({
+        quantity: acc.quantity + toNumber(fragment.quantity),
+        value: acc.value + toNumber(fragment.value),
+      }),
+      { quantity: 0, value: 0 },
+    );
+
+    const totalQuantity =
+      computeOrderTotalQuantity(order) ||
+      fragmentTotals.quantity ||
+      products.reduce(
+        (sum, product) =>
+          sum + toNumber(product.quantity ?? (product as any).quantity),
+        0,
+      );
+
+    const fragmentSummaryBlock = fragments.length
+      ? `<div class="summary-item">
+            <label>Fragmentos</label>
+            <span>${fragments.length} fragmento(s) · ${
+              fragmentTotals.quantity
+            } unidade(s)</span>
+          </div>`
+      : "";
+
+    const printedAt = formatDateTime(new Date());
+
+    return `<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Pedido ${escapeHtml(order.order_number)}</title>
+    <style>
+      * { box-sizing: border-box; }
+      body { font-family: 'Inter', Arial, sans-serif; background: #0f172a0d; color: #0f172a; margin: 0; padding: 32px; }
+      .card { background: #ffffff; border-radius: 16px; padding: 32px; margin: 0 auto; max-width: 960px; box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.25); }
+      h1 { margin: 0 0 24px; font-size: 28px; color: #0f172a; }
+      h2 { margin: 0 0 16px; font-size: 18px; color: #0f172a; }
+      .muted { color: #64748b; font-size: 12px; }
+      .grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+      .info-card { background: #f8fafc; border-radius: 12px; padding: 16px; border: 1px solid #e2e8f0; }
+      .info-card strong { display: block; font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: #475569; margin-bottom: 4px; }
+      .info-card span { font-size: 14px; font-weight: 600; color: #0f172a; }
+      .data-table { width: 100%; border-collapse: collapse; }
+      .data-table thead th { text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: #475569; padding: 12px 16px; background: #f1f5f9; border-bottom: 1px solid #e2e8f0; }
+      .data-table tbody td { padding: 12px 16px; border-bottom: 1px solid #e2e8f0; font-size: 14px; vertical-align: top; }
+      .data-table tbody tr:last-child td { border-bottom: none; }
+      .data-table td.center { text-align: center; }
+      .data-table td.right { text-align: right; }
+      .empty { text-align: center; padding: 24px !important; color: #64748b; font-style: italic; }
+      .section { margin-top: 32px; }
+      .summary { margin-top: 24px; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 16px; background: #f8fafc; border-radius: 12px; padding: 16px; border: 1px solid #e2e8f0; }
+      .summary-item { min-width: 180px; }
+      .summary-item label { display: block; font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: #475569; margin-bottom: 4px; }
+      .summary-item span { font-size: 16px; font-weight: 700; color: #0f172a; }
+      footer { margin-top: 32px; display: flex; justify-content: space-between; font-size: 12px; color: #94a3b8; }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <header>
+        <h1>Resumo do Pedido ${escapeHtml(order.order_number)}</h1>
+        <div class="muted">Gerado em ${printedAt}</div>
+      </header>
+
+      <div class="grid">
+        <div class="info-card">
+          <strong>Cliente</strong>
+          <span>${escapeHtml(order.customer_name || "Cliente não informado")}</span>
+          <div class="muted">${escapeHtml(order.customer_email || "Sem e-mail")}</div>
+          <div class="muted">${escapeHtml(order.customer_phone || "Sem telefone")}</div>
+        </div>
+        <div class="info-card">
+          <strong>Vendedor</strong>
+          <span>${escapeHtml(order.seller_name || "Não atribuído")}</span>
+        </div>
+        <div class="info-card">
+          <strong>Status</strong>
+          <span>${statusLabels[order.status]}</span>
+        </div>
+        <div class="info-card">
+          <strong>Prioridade</strong>
+          <span>${priorityLabels[order.priority]}</span>
+        </div>
+      </div>
+
+      <div class="grid" style="margin-top: 16px;">
+        <div class="info-card">
+          <strong>Data de Produção</strong>
+          <span>${formatDate(order.scheduled_date)}</span>
+        </div>
+        <div class="info-card">
+          <strong>Data de Entrega</strong>
+          <span>${
+            order.delivery_date
+              ? formatDate(order.delivery_date)
+              : "Não definida"
+          }</span>
+        </div>
+        <div class="info-card">
+          <strong>Progresso</strong>
+          <span>${order.production_progress}% concluído</span>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>Itens do Pedido</h2>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Produto</th>
+              <th>Qtd.</th>
+              <th>Valor Unit.</th>
+              <th>Subtotal</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${productRows}
+          </tbody>
+        </table>
+      </div>
+
+      ${fragmentsSection}
+      ${notesSection}
+
+      <div class="summary">
+        <div class="summary-item">
+          <label>Valor Total</label>
+          <span>${formatCurrency(order.total_amount || 0)}</span>
+        </div>
+        <div class="summary-item">
+          <label>Quantidade Total</label>
+          <span>${totalQuantity || "-"}</span>
+        </div>
+        ${fragmentSummaryBlock}
+      </div>
+
+      <footer>
+        <span>BioBoxsys • Sistema de Gestão de Produção</span>
+        <span>Impresso em ${printedAt}</span>
+      </footer>
+    </div>
+    <script>
+      window.onload = function() {
+        window.print();
+        setTimeout(function() { window.close(); }, 250);
+      };
+    </script>
+  </body>
+</html>`;
+  };
+
+  const buildOrdersListPrintHtml = (ordersList: Order[]): string => {
+    const printedAt = formatDateTime(new Date());
+    const rows = ordersList.length
+      ? ordersList
+          .map(
+            (order, index) => `
+              <tr>
+                <td>${index + 1}</td>
+                <td>${escapeHtml(order.order_number)}</td>
+                <td>
+                  <strong>${escapeHtml(order.customer_name || "-")}</strong>
+                  <div class="muted">${escapeHtml(order.customer_phone || "-")}</div>
+                </td>
+                <td>${statusLabels[order.status]}</td>
+                <td>${priorityLabels[order.priority]}</td>
+                <td>${formatDate(order.delivery_date || order.scheduled_date)}</td>
+                <td class="right">${formatCurrency(order.total_amount || 0)}</td>
+                <td class="center">${order.production_progress}%</td>
+              </tr>
+            `,
+          )
+          .join("")
+      : `<tr><td colspan="8" class="empty">Nenhum pedido no filtro atual.</td></tr>`;
+
+    const totals = ordersList.reduce(
+      (acc, order) => {
+        acc.value += order.total_amount || 0;
+        acc.status[order.status] = (acc.status[order.status] || 0) + 1;
+        return acc;
+      },
+      { value: 0, status: {} as Record<Order["status"], number> },
+    );
+
+    const summaryCards = [
+      { label: "Total de Pedidos", value: String(ordersList.length) },
+      {
+        label: "Em Produção",
+        value: String(totals.status["in_production"] || 0),
+      },
+      { label: "Pendentes", value: String(totals.status["pending"] || 0) },
+      { label: "Prontos", value: String(totals.status["ready"] || 0) },
+      { label: "Entregues", value: String(totals.status["delivered"] || 0) },
+      { label: "Valor Total", value: formatCurrency(totals.value) },
+    ]
+      .map(
+        (card) => `
+        <div class="summary-card">
+          <span>${card.label}</span>
+          <strong>${escapeHtml(card.value)}</strong>
+        </div>
+      `,
+      )
+      .join("");
+
+    return `<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Lista de Pedidos</title>
+    <style>
+      * { box-sizing: border-box; }
+      body { font-family: 'Inter', Arial, sans-serif; background: #0f172a0d; color: #0f172a; margin: 0; padding: 32px; }
+      .card { background: #ffffff; border-radius: 16px; padding: 32px; margin: 0 auto; max-width: 1100px; box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.25); }
+      h1 { margin: 0 0 24px; font-size: 28px; color: #0f172a; }
+      .muted { color: #64748b; font-size: 12px; }
+      .summary-grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin-bottom: 24px; }
+      .summary-card { background: #f8fafc; border-radius: 12px; padding: 16px; border: 1px solid #e2e8f0; }
+      .summary-card span { display: block; font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: #475569; margin-bottom: 8px; }
+      .summary-card strong { font-size: 20px; color: #0f172a; }
+      table { width: 100%; border-collapse: collapse; }
+      thead th { text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: #475569; padding: 12px 16px; background: #f1f5f9; border-bottom: 1px solid #e2e8f0; }
+      tbody td { padding: 12px 16px; border-bottom: 1px solid #e2e8f0; font-size: 14px; vertical-align: top; }
+      tbody td.center { text-align: center; }
+      tbody td.right { text-align: right; }
+      tbody tr:last-child td { border-bottom: none; }
+      .empty { text-align: center; padding: 24px !important; color: #64748b; font-style: italic; }
+      footer { margin-top: 32px; display: flex; justify-content: space-between; font-size: 12px; color: #94a3b8; }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <header>
+        <h1>Lista de Pedidos</h1>
+        <div class="muted">Gerado em ${printedAt}</div>
+      </header>
+
+      <div class="summary-grid">
+        ${summaryCards}
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Pedido</th>
+            <th>Cliente</th>
+            <th>Status</th>
+            <th>Prioridade</th>
+            <th>Entrega</th>
+            <th>Valor</th>
+            <th>Progresso</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows}
+        </tbody>
+      </table>
+
+      <footer>
+        <span>BioBoxsys • Sistema de Gestão de Produção</span>
+        <span>Impresso em ${printedAt}</span>
+      </footer>
+    </div>
+    <script>
+      window.onload = function() {
+        window.print();
+        setTimeout(function() { window.close(); }, 250);
+      };
+    </script>
+  </body>
+</html>`;
   };
 
   const getDaysUntilDelivery = (deliveryDate?: string) => {
@@ -645,7 +1246,9 @@ export default function OrdersSupabase() {
               <SelectValue placeholder="Todos os Status" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem key="all" value="all">Todos os Status</SelectItem>
+              <SelectItem key="all" value="all">
+                Todos os Status
+              </SelectItem>
               {Object.entries(statusLabels).map(([key, label]) => (
                 <SelectItem key={key} value={key}>
                   {label}
@@ -662,7 +1265,9 @@ export default function OrdersSupabase() {
               <SelectValue placeholder="Todas as Prioridades" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem key="all" value="all">Todas as Prioridades</SelectItem>
+              <SelectItem key="all" value="all">
+                Todas as Prioridades
+              </SelectItem>
               {Object.entries(priorityLabels).map(([key, label]) => (
                 <SelectItem key={key} value={key}>
                   {label}
@@ -762,8 +1367,16 @@ export default function OrdersSupabase() {
                                 className={`w-2 h-2 rounded-full ${priorityColors[order.priority]}`}
                               />
                               <div>
-                                <div className="font-medium">
+                                <div className="font-medium flex items-center gap-2">
                                   {order.order_number}
+                                  {order.is_fragmented && (
+                                    <Badge
+                                      variant="outline"
+                                      className="text-xs"
+                                    >
+                                      Fragmentado
+                                    </Badge>
+                                  )}
                                 </div>
                                 {order.assigned_operator && (
                                   <div className="flex items-center text-xs text-muted-foreground">
@@ -879,6 +1492,19 @@ export default function OrdersSupabase() {
                                     {action.label}
                                   </Button>
                                 ))}
+                              {checkPermission("orders", "edit") &&
+                                !["delivered", "cancelled"].includes(
+                                  order.status,
+                                ) && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => openFragmentForm(order)}
+                                  >
+                                    <Scissors className="h-4 w-4 mr-2" />
+                                    Fragmentar
+                                  </Button>
+                                )}
                               {checkPermission("orders", "edit") && (
                                 <Button variant="ghost" size="icon">
                                   <Edit className="h-4 w-4" />
@@ -994,11 +1620,72 @@ export default function OrdersSupabase() {
                   </div>
                 )}
 
+                {selectedOrder.fragments &&
+                  selectedOrder.fragments.length > 0 && (
+                    <div>
+                      <h3 className="font-semibold mb-2">
+                        Fragmentação de Produção
+                      </h3>
+                      <div className="space-y-2">
+                        {selectedOrder.fragments.map((fragment) => (
+                          <div
+                            key={fragment.id}
+                            className="border border-border rounded-lg p-3"
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="font-medium">
+                                Fragmento {fragment.fragment_number} ·{" "}
+                                {fragment.quantity} unidade(s)
+                              </span>
+                              <Badge
+                                className={
+                                  fragmentStatusColors[fragment.status] ||
+                                  fragmentStatusColors.pending
+                                }
+                              >
+                                {fragmentStatusLabels[fragment.status]}
+                              </Badge>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2 text-sm text-muted-foreground">
+                              <span>
+                                Produção:{" "}
+                                {formatDate(fragment.scheduled_date as any)}
+                              </span>
+                              {fragment.value ? (
+                                <span>
+                                  Valor: {formatCurrency(fragment.value)}
+                                </span>
+                              ) : null}
+                              <span>Progresso: {fragment.progress ?? 0}%</span>
+                              {fragment.assigned_operator ? (
+                                <span>
+                                  Operador: {fragment.assigned_operator}
+                                </span>
+                              ) : null}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                 <div className="flex justify-between">
                   <div className="text-lg font-bold">
                     Total: {formatCurrency(selectedOrder.total_amount)}
                   </div>
                   <div className="space-x-2">
+                    {checkPermission("orders", "edit") &&
+                      !["delivered", "cancelled"].includes(
+                        selectedOrder.status,
+                      ) && (
+                        <Button
+                          variant="outline"
+                          onClick={() => openFragmentForm(selectedOrder)}
+                        >
+                          <Scissors className="h-4 w-4 mr-2" />
+                          Fragmentar Produção
+                        </Button>
+                      )}
                     <Button
                       variant="outline"
                       onClick={() => handlePrintOrder(selectedOrder)}
@@ -1039,6 +1726,20 @@ export default function OrdersSupabase() {
           onOpenChange={setShowNewOrderForm}
           onOrderCreated={handleOrderCreated}
         />
+
+        {showFragmentForm && fragmentTarget && (
+          <OrderFragmentForm
+            totalQuantity={Math.max(
+              1,
+              resolveFragmentTotalQuantity(fragmentTarget, fragmentInitial),
+            )}
+            totalValue={toNumber(fragmentTarget.total_amount)}
+            orderId={fragmentTarget.id}
+            initialFragments={fragmentInitial}
+            onSave={handleSaveFragments}
+            onCancel={closeFragmentForm}
+          />
+        )}
       </div>
     </DashboardLayout>
   );
