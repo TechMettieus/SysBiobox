@@ -1580,7 +1580,8 @@ export default function OrdersSupabase() {
                 </Table>
                 <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <p className="text-sm text-muted-foreground">
-                    Mostrando {hasOrders ? `${rangeStart}–${rangeEnd}` : "0"} de {filteredOrders.length} pedidos
+                    Mostrando {hasOrders ? `${rangeStart}–${rangeEnd}` : "0"} de{" "}
+                    {filteredOrders.length} pedidos
                   </p>
                   <div className="flex items-center gap-2">
                     <Button
@@ -1608,9 +1609,7 @@ export default function OrdersSupabase() {
                       variant="outline"
                       size="sm"
                       onClick={() =>
-                        setCurrentPage((prev) =>
-                          Math.min(pageCount, prev + 1),
-                        )
+                        setCurrentPage((prev) => Math.min(pageCount, prev + 1))
                       }
                       disabled={currentPage === pageCount || !hasOrders}
                     >
