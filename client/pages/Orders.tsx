@@ -33,7 +33,6 @@ import {
   Package,
   Plus,
   Search,
-  ListFilter as Filter,
   Eye,
   CreditCard as Edit,
   Printer,
@@ -46,6 +45,10 @@ import {
   DollarSign,
   Trash2,
   Scissors,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import {
@@ -103,6 +106,8 @@ const fragmentStatusColors = {
   completed: "bg-green-500/10 text-green-500 border-green-500/20",
 };
 
+const PAGE_SIZE = 10;
+
 export default function OrdersSupabase() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -117,6 +122,7 @@ export default function OrdersSupabase() {
   const [showOrderDetails, setShowOrderDetails] = useState(false);
   const [showNewOrderForm, setShowNewOrderForm] = useState(false);
   const [activeTab, setActiveTab] = useState("all");
+  const [currentPage, setCurrentPage] = useState(1);
 
   const { checkPermission } = useAuth();
   const { getOrders, createOrder, updateOrder, deleteOrder, isConnected } =
@@ -344,6 +350,31 @@ export default function OrdersSupabase() {
       return matchesSearch && matchesStatus && matchesPriority && matchesTab;
     });
   }, [orders, searchTerm, statusFilter, priorityFilter, activeTab]);
+
+  const pageCount = Math.max(1, Math.ceil(filteredOrders.length / PAGE_SIZE));
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter, priorityFilter, activeTab]);
+
+  useEffect(() => {
+    const nextMax = Math.max(1, Math.ceil(filteredOrders.length / PAGE_SIZE));
+    setCurrentPage((prev) => (prev > nextMax ? nextMax : prev));
+  }, [filteredOrders.length]);
+
+  const paginatedOrders = useMemo(() => {
+    const start = (currentPage - 1) * PAGE_SIZE;
+    return filteredOrders.slice(start, start + PAGE_SIZE);
+  }, [filteredOrders, currentPage]);
+
+  const hasOrders = filteredOrders.length > 0;
+  const rangeStart = hasOrders ? (currentPage - 1) * PAGE_SIZE + 1 : 0;
+  const rangeEnd = hasOrders
+    ? Math.min(
+        filteredOrders.length,
+        Math.max(rangeStart, rangeStart + paginatedOrders.length - 1),
+      )
+    : 0;
 
   // Statistics
   const stats = useMemo(() => {
@@ -1345,197 +1376,256 @@ export default function OrdersSupabase() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredOrders.map((order) => {
-                      const daysUntilDelivery = getDaysUntilDelivery(
-                        order.delivery_date,
-                      );
-                      const isOverdue =
-                        daysUntilDelivery !== null &&
-                        daysUntilDelivery < 0 &&
-                        !["delivered", "cancelled"].includes(order.status);
-
-                      return (
-                        <TableRow
-                          key={order.id}
-                          className={
-                            isOverdue ? "bg-red-50 dark:bg-red-950/20" : ""
-                          }
+                    {paginatedOrders.length === 0 ? (
+                      <TableRow>
+                        <TableCell
+                          colSpan={10}
+                          className="h-24 text-center text-muted-foreground"
                         >
-                          <TableCell>
-                            <div className="flex items-center space-x-2">
-                              <div
-                                className={`w-2 h-2 rounded-full ${priorityColors[order.priority]}`}
-                              />
-                              <div>
-                                <div className="font-medium flex items-center gap-2">
-                                  {order.order_number}
-                                  {order.is_fragmented && (
-                                    <Badge
-                                      variant="outline"
-                                      className="text-xs"
-                                    >
-                                      Fragmentado
-                                    </Badge>
+                          Nenhum pedido encontrado.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      paginatedOrders.map((order) => {
+                        const daysUntilDelivery = getDaysUntilDelivery(
+                          order.delivery_date,
+                        );
+                        const isOverdue =
+                          daysUntilDelivery !== null &&
+                          daysUntilDelivery < 0 &&
+                          !["delivered", "cancelled"].includes(order.status);
+
+                        return (
+                          <TableRow
+                            key={order.id}
+                            className={
+                              isOverdue ? "bg-red-50 dark:bg-red-950/20" : ""
+                            }
+                          >
+                            <TableCell>
+                              <div className="flex items-center space-x-2">
+                                <div
+                                  className={`w-2 h-2 rounded-full ${priorityColors[order.priority]}`}
+                                />
+                                <div>
+                                  <div className="font-medium flex items-center gap-2">
+                                    {order.order_number}
+                                    {order.is_fragmented && (
+                                      <Badge
+                                        variant="outline"
+                                        className="text-xs"
+                                      >
+                                        Fragmentado
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  {order.assigned_operator && (
+                                    <div className="flex items-center text-xs text-muted-foreground">
+                                      <User className="h-3 w-3 mr-1" />
+                                      {order.assigned_operator}
+                                    </div>
                                   )}
                                 </div>
-                                {order.assigned_operator && (
-                                  <div className="flex items-center text-xs text-muted-foreground">
-                                    <User className="h-3 w-3 mr-1" />
-                                    {order.assigned_operator}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div>
+                                <div className="font-medium">
+                                  {order.customer_name}
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                  {order.customer_phone}
+                                </div>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div>
+                                <div className="font-medium text-biobox-green">
+                                  {order.seller_name}
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                  Vendedor
+                                </div>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="text-sm">
+                                {formatDate(order.scheduled_date)}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="text-sm">
+                                {order.delivery_date
+                                  ? formatDate(order.delivery_date)
+                                  : "-"}
+                                {daysUntilDelivery !== null && (
+                                  <div
+                                    className={`text-xs ${isOverdue ? "text-red-500" : daysUntilDelivery <= 3 ? "text-orange-500" : "text-muted-foreground"}`}
+                                  >
+                                    {isOverdue
+                                      ? `${Math.abs(daysUntilDelivery)} dias atrasado`
+                                      : daysUntilDelivery === 0
+                                        ? "Hoje"
+                                        : daysUntilDelivery === 1
+                                          ? "Amanhã"
+                                          : `${daysUntilDelivery} dias`}
                                   </div>
                                 )}
                               </div>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <div>
-                              <div className="font-medium">
-                                {order.customer_name}
-                              </div>
-                              <div className="text-xs text-muted-foreground">
-                                {order.customer_phone}
-                              </div>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <div>
-                              <div className="font-medium text-biobox-green">
-                                {order.seller_name}
-                              </div>
-                              <div className="text-xs text-muted-foreground">
-                                Vendedor
-                              </div>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="text-sm">
-                              {formatDate(order.scheduled_date)}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="text-sm">
-                              {order.delivery_date
-                                ? formatDate(order.delivery_date)
-                                : "-"}
-                              {daysUntilDelivery !== null && (
-                                <div
-                                  className={`text-xs ${isOverdue ? "text-red-500" : daysUntilDelivery <= 3 ? "text-orange-500" : "text-muted-foreground"}`}
-                                >
-                                  {isOverdue
-                                    ? `${Math.abs(daysUntilDelivery)} dias atrasado`
-                                    : daysUntilDelivery === 0
-                                      ? "Hoje"
-                                      : daysUntilDelivery === 1
-                                        ? "Amanhã"
-                                        : `${daysUntilDelivery} dias`}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center space-x-2">
+                                <div className="w-full bg-gray-200 rounded-full h-2">
+                                  <div
+                                    className="bg-biobox-green h-2 rounded-full"
+                                    style={{
+                                      width: `${order.production_progress}%`,
+                                    }}
+                                  ></div>
                                 </div>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center space-x-2">
-                              <div className="w-full bg-gray-200 rounded-full h-2">
-                                <div
-                                  className="bg-biobox-green h-2 rounded-full"
-                                  style={{
-                                    width: `${order.production_progress}%`,
-                                  }}
-                                ></div>
+                                <span className="text-xs text-muted-foreground">
+                                  {order.production_progress}%
+                                </span>
                               </div>
-                              <span className="text-xs text-muted-foreground">
-                                {order.production_progress}%
-                              </span>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <Badge className={statusColors[order.status]}>
-                              {statusLabels[order.status]}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <Badge className={priorityColors[order.priority]}>
-                              {priorityLabels[order.priority]}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="font-medium">
-                            {formatCurrency(order.total_amount)}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center space-x-2">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleViewOrder(order)}
-                              >
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                              {availableActions(order)
-                                .filter((a) =>
-                                  checkPermission(
-                                    "orders",
-                                    a.perm.split(":")[1],
-                                  ),
-                                )
-                                .map((action) => (
-                                  <Button
-                                    key={action.label}
-                                    variant="secondary"
-                                    size="sm"
-                                    onClick={() =>
-                                      handleTransition(
-                                        order,
-                                        action.next,
-                                        action.progress,
-                                      )
-                                    }
-                                  >
-                                    {action.label}
-                                  </Button>
-                                ))}
-                              {checkPermission("orders", "edit") &&
-                                !["delivered", "cancelled"].includes(
-                                  order.status,
-                                ) && (
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => openFragmentForm(order)}
-                                  >
-                                    <Scissors className="h-4 w-4 mr-2" />
-                                    Fragmentar
-                                  </Button>
-                                )}
-                              {checkPermission("orders", "edit") && (
-                                <Button variant="ghost" size="icon">
-                                  <Edit className="h-4 w-4" />
-                                </Button>
-                              )}
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handlePrintOrder(order)}
-                                title="Imprimir Pedido"
-                              >
-                                <Printer className="h-4 w-4" />
-                              </Button>
-                              {checkPermission("orders", "delete") && (
+                            </TableCell>
+                            <TableCell>
+                              <Badge className={statusColors[order.status]}>
+                                {statusLabels[order.status]}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <Badge className={priorityColors[order.priority]}>
+                                {priorityLabels[order.priority]}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="font-medium">
+                              {formatCurrency(order.total_amount)}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center space-x-2">
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  onClick={() => handleDeleteOrder(order.id)}
-                                  title="Excluir Pedido"
-                                  className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                                  onClick={() => handleViewOrder(order)}
                                 >
-                                  <Trash2 className="h-4 w-4" />
+                                  <Eye className="h-4 w-4" />
                                 </Button>
-                              )}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
+                                {availableActions(order)
+                                  .filter((a) =>
+                                    checkPermission(
+                                      "orders",
+                                      a.perm.split(":")[1],
+                                    ),
+                                  )
+                                  .map((action) => (
+                                    <Button
+                                      key={action.label}
+                                      variant="secondary"
+                                      size="sm"
+                                      onClick={() =>
+                                        handleTransition(
+                                          order,
+                                          action.next,
+                                          action.progress,
+                                        )
+                                      }
+                                    >
+                                      {action.label}
+                                    </Button>
+                                  ))}
+                                {checkPermission("orders", "edit") &&
+                                  !["delivered", "cancelled"].includes(
+                                    order.status,
+                                  ) && (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => openFragmentForm(order)}
+                                    >
+                                      <Scissors className="h-4 w-4 mr-2" />
+                                      Fragmentar
+                                    </Button>
+                                  )}
+                                {checkPermission("orders", "edit") && (
+                                  <Button variant="ghost" size="icon">
+                                    <Edit className="h-4 w-4" />
+                                  </Button>
+                                )}
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handlePrintOrder(order)}
+                                  title="Imprimir Pedido"
+                                >
+                                  <Printer className="h-4 w-4" />
+                                </Button>
+                                {checkPermission("orders", "delete") && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleDeleteOrder(order.id)}
+                                    title="Excluir Pedido"
+                                    className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
+                    )}
                   </TableBody>
                 </Table>
+                <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-sm text-muted-foreground">
+                    Mostrando {hasOrders ? `${rangeStart}–${rangeEnd}` : "0"} de {filteredOrders.length} pedidos
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(1)}
+                      disabled={currentPage === 1}
+                    >
+                      <ChevronsLeft className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        setCurrentPage((prev) => Math.max(1, prev - 1))
+                      }
+                      disabled={currentPage === 1}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <span className="text-sm text-muted-foreground">
+                      Página {currentPage} de {pageCount}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        setCurrentPage((prev) =>
+                          Math.min(pageCount, prev + 1),
+                        )
+                      }
+                      disabled={currentPage === pageCount || !hasOrders}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(pageCount)}
+                      disabled={currentPage === pageCount || !hasOrders}
+                    >
+                      <ChevronsRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
               </TabsContent>
             </Tabs>
           </CardContent>
