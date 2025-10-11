@@ -3,53 +3,29 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import {
-  Users,
-  Plus,
-  CreditCard as Edit,
-  Trash2,
-  Shield,
-  User as UserIcon,
-  Save,
-  X,
-  Eye,
-  EyeOff,
-} from "lucide-react";
+import { Users, Plus, Edit, Trash2, Shield, User as UserIcon, Save, X, Eye, EyeOff, Loader2 } from "lucide-react";
 import { User as UserType, mockUsers, defaultPermissions } from "@/types/user";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useSupabase } from "@/hooks/useSupabase";
-import { db, isFirebaseConfigured } from "@/lib/firebase";
-import { addDoc, collection, serverTimestamp } from "firebase/firestore";
+import { db, isFirebaseConfigured, auth } from "@/lib/firebase";
+import { addDoc, collection, serverTimestamp, updateDoc, doc } from "firebase/firestore";
+import { createUserWithEmailAndPassword } from "firebase/auth";
 import { sanitizeForFirestore } from "@/lib/firestore";
+import { useToast } from "@/components/ui/use-toast";
 
-interface UserManagementProps {
-  onUserCreated?: (user: UserType) => void;
-}
-
-export default function UserManagement({ onUserCreated }: UserManagementProps) {
+export default function UserManagement() {
   const [users, setUsers] = useState<UserType[]>([]);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const { user } = useAuth();
   const { getUsers: fetchUsers } = useSupabase();
+  const { toast } = useToast();
   const [showForm, setShowForm] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserType | undefined>();
   const [showPermissions, setShowPermissions] = useState(false);
@@ -72,10 +48,7 @@ export default function UserManagement({ onUserCreated }: UserManagementProps) {
         status: "active",
         permissions: (u.permissions || []).map((permId) => {
           const perm = defaultPermissions.find((p) => p.id === permId);
-          return (
-            perm ||
-            ({ id: permId, name: permId, module: "system", actions: [] } as any)
-          );
+          return perm || ({ id: permId, name: permId, module: "system", actions: [] } as any);
         }),
         createdAt: new Date(u.created_at),
         updatedAt: new Date(u.updated_at),
@@ -100,7 +73,14 @@ export default function UserManagement({ onUserCreated }: UserManagementProps) {
   });
 
   const handleCreateUser = () => {
-    if (user?.role !== "admin") return;
+    if (user?.role !== "admin") {
+      toast({
+        title: "Sem permissão",
+        description: "Apenas administradores podem criar usuários",
+        variant: "destructive",
+      });
+      return;
+    }
     setSelectedUser(undefined);
     setFormData({
       name: "",
@@ -127,69 +107,233 @@ export default function UserManagement({ onUserCreated }: UserManagementProps) {
   };
 
   const handleSaveUser = async () => {
-    const userPermissions = defaultPermissions.filter((p) =>
-      formData.permissions.includes(p.id),
-    );
+    try {
+      setSaving(true);
 
-    if (selectedUser) {
-      setUsers((prev) =>
-        prev.map((u) =>
-          u.id === selectedUser.id
-            ? {
-                ...u,
-                name: formData.name,
-                email: formData.email,
-                role: formData.role,
-                status: formData.status,
-                permissions: userPermissions,
-                updatedAt: new Date(),
-              }
-            : u,
-        ),
-      );
-    } else {
-      const newUser: UserType = {
-        id: Date.now().toString(),
-        name: formData.name,
-        email: formData.email,
-        role: formData.role,
-        permissions: userPermissions,
-        status: formData.status,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        createdBy: "1",
-      };
-      setUsers((prev) => [newUser, ...prev]);
-      onUserCreated?.(newUser);
-
-      try {
-        if (isFirebaseConfigured && db) {
-          await addDoc(
-            collection(db, "users"),
-            sanitizeForFirestore({
-              name: newUser.name,
-              email: newUser.email,
-              role: newUser.role,
-              permissions: newUser.permissions.map((p) => p.id),
-              status: newUser.status,
-              created_at: serverTimestamp(),
-              updated_at: serverTimestamp(),
-            }),
-          );
-        }
-      } catch (e) {
-        console.warn("Falha ao salvar usuário no Firestore (opcional):", e);
+      // Validações
+      if (!formData.name.trim()) {
+        toast({
+          title: "Nome obrigatório",
+          description: "Por favor, informe o nome do usuário",
+          variant: "destructive",
+        });
+        return;
       }
-    }
 
-    setShowForm(false);
-    setSelectedUser(undefined);
+      if (!formData.email.trim() || !formData.email.includes("@")) {
+        toast({
+          title: "Email inválido",
+          description: "Por favor, informe um email válido",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (!selectedUser && !formData.password) {
+        toast({
+          title: "Senha obrigatória",
+          description: "Por favor, informe uma senha para o novo usuário",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (!selectedUser && formData.password.length < 6) {
+        toast({
+          title: "Senha muito curta",
+          description: "A senha deve ter no mínimo 6 caracteres",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const userPermissions = defaultPermissions.filter((p) =>
+        formData.permissions.includes(p.id),
+      );
+
+      if (selectedUser) {
+        // **EDITAR USUÁRIO EXISTENTE**
+        const updatedData = {
+          name: formData.name.trim(),
+          email: formData.email.trim().toLowerCase(),
+          role: formData.role,
+          status: formData.status,
+          permissions: userPermissions.map((p) => p.id),
+          updated_at: serverTimestamp(),
+        };
+
+        if (isFirebaseConfigured && db) {
+          try {
+            await updateDoc(doc(db, "users", selectedUser.id), sanitizeForFirestore(updatedData));
+            
+            toast({
+              title: "Usuário atualizado",
+              description: `${formData.name} foi atualizado com sucesso`,
+            });
+          } catch (error: any) {
+            console.error("Erro ao atualizar no Firebase:", error);
+            toast({
+              title: "Erro ao atualizar",
+              description: error.message || "Não foi possível atualizar o usuário",
+              variant: "destructive",
+            });
+            return;
+          }
+        }
+
+        // Atualizar estado local
+        setUsers((prev) =>
+          prev.map((u) =>
+            u.id === selectedUser.id
+              ? {
+                  ...u,
+                  name: formData.name,
+                  email: formData.email,
+                  role: formData.role,
+                  status: formData.status,
+                  permissions: userPermissions,
+                  updatedAt: new Date(),
+                }
+              : u,
+          ),
+        );
+
+      } else {
+        // **CRIAR NOVO USUÁRIO**
+        let userId: string;
+        let createdInAuth = false;
+
+        // Criar no Firebase Auth se disponível
+        if (isFirebaseConfigured && auth) {
+          try {
+            const userCredential = await createUserWithEmailAndPassword(
+              auth,
+              formData.email.trim().toLowerCase(),
+              formData.password
+            );
+            userId = userCredential.user.uid;
+            createdInAuth = true;
+
+            toast({
+              title: "Conta criada no Firebase Auth",
+              description: "Usuário autenticado criado com sucesso",
+            });
+          } catch (error: any) {
+            console.error("Erro no Firebase Auth:", error);
+            
+            // Se o erro for email já existente, informar
+            if (error.code === 'auth/email-already-in-use') {
+              toast({
+                title: "Email já cadastrado",
+                description: "Este email já está sendo usado por outro usuário",
+                variant: "destructive",
+              });
+              return;
+            }
+            
+            // Para outros erros, continuar sem auth (fallback)
+            userId = `user-${Date.now()}`;
+            toast({
+              title: "Aviso",
+              description: "Usuário criado sem autenticação Firebase",
+              variant: "destructive",
+            });
+          }
+        } else {
+          userId = `user-${Date.now()}`;
+        }
+
+        const newUserData = {
+          name: formData.name.trim(),
+          email: formData.email.trim().toLowerCase(),
+          role: formData.role,
+          permissions: userPermissions.map((p) => p.id),
+          status: formData.status,
+          created_at: serverTimestamp(),
+          updated_at: serverTimestamp(),
+        };
+
+        // Salvar no Firestore
+        if (isFirebaseConfigured && db) {
+          try {
+            await addDoc(
+              collection(db, "users"),
+              sanitizeForFirestore({
+                ...newUserData,
+                uid: userId,
+              })
+            );
+          } catch (error: any) {
+            console.error("Erro ao salvar no Firestore:", error);
+            toast({
+              title: "Erro ao salvar",
+              description: "Usuário criado mas não salvo no banco",
+              variant: "destructive",
+            });
+          }
+        }
+
+        const newUser: UserType = {
+          id: userId,
+          name: formData.name,
+          email: formData.email,
+          role: formData.role,
+          permissions: userPermissions,
+          status: formData.status,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          createdBy: user?.id || "system",
+        };
+
+        setUsers((prev) => [newUser, ...prev]);
+
+        toast({
+          title: "Usuário criado",
+          description: `${formData.name} foi adicionado ao sistema${createdInAuth ? ' com autenticação' : ''}`,
+        });
+      }
+
+      setShowForm(false);
+      setSelectedUser(undefined);
+      
+      // Recarregar usuários para garantir sincronia
+      await loadUsers();
+
+    } catch (error: any) {
+      console.error("Erro ao salvar usuário:", error);
+      toast({
+        title: "Erro inesperado",
+        description: error.message || "Não foi possível salvar o usuário",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleDeleteUser = (userId: string) => {
-    if (!confirm("Tem certeza que deseja excluir este usuário?")) return;
+    if (userId === user?.id) {
+      toast({
+        title: "Ação não permitida",
+        description: "Você não pode excluir sua própria conta",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const userToDelete = users.find(u => u.id === userId);
+    if (!userToDelete) return;
+
+    if (!confirm(`Tem certeza que deseja excluir ${userToDelete.name}?\n\nEsta ação não pode ser desfeita.`)) {
+      return;
+    }
+
     setUsers((prev) => prev.filter((u) => u.id !== userId));
-    alert("Usuário excluído com sucesso!");
+    
+    toast({
+      title: "Usuário excluído",
+      description: `${userToDelete.name} foi removido do sistema`,
+    });
   };
 
   const handleManagePermissions = (u: UserType) => {
@@ -201,21 +345,47 @@ export default function UserManagement({ onUserCreated }: UserManagementProps) {
     setShowPermissions(true);
   };
 
-  const handleSavePermissions = () => {
+  const handleSavePermissions = async () => {
     if (!permissionUser) return;
-    const userPermissions = defaultPermissions.filter((p) =>
-      formData.permissions.includes(p.id),
-    );
-    setUsers((prev) =>
-      prev.map((u) =>
-        u.id === permissionUser.id
-          ? { ...u, permissions: userPermissions, updatedAt: new Date() }
-          : u,
-      ),
-    );
-    setShowPermissions(false);
-    setPermissionUser(undefined);
-    alert("Permissões atualizadas com sucesso!");
+    
+    try {
+      const userPermissions = defaultPermissions.filter((p) =>
+        formData.permissions.includes(p.id),
+      );
+
+      if (isFirebaseConfigured && db) {
+        await updateDoc(
+          doc(db, "users", permissionUser.id),
+          sanitizeForFirestore({
+            permissions: userPermissions.map((p) => p.id),
+            updated_at: serverTimestamp(),
+          })
+        );
+      }
+
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.id === permissionUser.id
+            ? { ...u, permissions: userPermissions, updatedAt: new Date() }
+            : u,
+        ),
+      );
+      
+      setShowPermissions(false);
+      setPermissionUser(undefined);
+      
+      toast({
+        title: "Permissões atualizadas",
+        description: `Permissões de ${permissionUser.name} foram atualizadas`,
+      });
+    } catch (error: any) {
+      console.error("Erro ao atualizar permissões:", error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível atualizar as permissões",
+        variant: "destructive",
+      });
+    }
   };
 
   const togglePermission = (permissionId: string) => {
@@ -235,7 +405,7 @@ export default function UserManagement({ onUserCreated }: UserManagementProps) {
       {loading ? (
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-biobox-green mx-auto mb-4"></div>
+            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-biobox-green" />
             <p>Carregando usuários...</p>
           </div>
         </div>
@@ -356,7 +526,7 @@ export default function UserManagement({ onUserCreated }: UserManagementProps) {
                           >
                             <Shield className="h-4 w-4" />
                           </Button>
-                          {u.role !== "admin" && (
+                          {u.role !== "admin" && u.id !== user?.id && (
                             <Button
                               variant="ghost"
                               size="icon"
@@ -389,6 +559,7 @@ export default function UserManagement({ onUserCreated }: UserManagementProps) {
                       variant="ghost"
                       size="icon"
                       onClick={() => setShowForm(false)}
+                      disabled={saving}
                     >
                       <X className="h-4 w-4" />
                     </Button>
@@ -396,7 +567,7 @@ export default function UserManagement({ onUserCreated }: UserManagementProps) {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div>
-                    <Label htmlFor="name">Nome Completo</Label>
+                    <Label htmlFor="name">Nome Completo *</Label>
                     <Input
                       id="name"
                       value={formData.name}
@@ -408,10 +579,11 @@ export default function UserManagement({ onUserCreated }: UserManagementProps) {
                       }
                       placeholder="Nome do usuário"
                       required
+                      disabled={saving}
                     />
                   </div>
                   <div>
-                    <Label htmlFor="email">E-mail</Label>
+                    <Label htmlFor="email">E-mail *</Label>
                     <Input
                       id="email"
                       type="email"
@@ -424,13 +596,19 @@ export default function UserManagement({ onUserCreated }: UserManagementProps) {
                       }
                       placeholder="usuario@bioboxsys.com"
                       required
+                      disabled={saving || !!selectedUser}
                     />
+                    {selectedUser && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Email não pode ser alterado
+                      </p>
+                    )}
                   </div>
                   <div>
                     <Label htmlFor="password">
                       {selectedUser
                         ? "Nova Senha (deixe vazio para manter)"
-                        : "Senha"}
+                        : "Senha *"}
                     </Label>
                     <div className="relative">
                       <Input
@@ -443,8 +621,9 @@ export default function UserManagement({ onUserCreated }: UserManagementProps) {
                             password: e.target.value,
                           }))
                         }
-                        placeholder="••••••••"
+                        placeholder="Mínimo 6 caracteres"
                         required={!selectedUser}
+                        disabled={saving}
                       />
                       <Button
                         type="button"
@@ -452,6 +631,7 @@ export default function UserManagement({ onUserCreated }: UserManagementProps) {
                         size="icon"
                         className="absolute right-0 top-0 h-full px-3"
                         onClick={() => setShowPassword(!showPassword)}
+                        disabled={saving}
                       >
                         {showPassword ? (
                           <EyeOff className="h-4 w-4" />
@@ -462,12 +642,13 @@ export default function UserManagement({ onUserCreated }: UserManagementProps) {
                     </div>
                   </div>
                   <div>
-                    <Label htmlFor="role">Tipo de Usuário</Label>
+                    <Label htmlFor="role">Tipo de Usuário *</Label>
                     <Select
                       value={formData.role}
                       onValueChange={(value: any) =>
                         setFormData((prev) => ({ ...prev, role: value }))
                       }
+                      disabled={saving}
                     >
                       <SelectTrigger>
                         <SelectValue />
@@ -475,17 +656,17 @@ export default function UserManagement({ onUserCreated }: UserManagementProps) {
                       <SelectContent>
                         <SelectItem value="admin">Administrador</SelectItem>
                         <SelectItem value="seller">Vendedor</SelectItem>
-                        <SelectItem value="operator">Operador</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                   <div>
-                    <Label htmlFor="status">Status</Label>
+                    <Label htmlFor="status">Status *</Label>
                     <Select
                       value={formData.status}
                       onValueChange={(value: any) =>
                         setFormData((prev) => ({ ...prev, status: value }))
                       }
+                      disabled={saving}
                     >
                       <SelectTrigger>
                         <SelectValue />
@@ -501,20 +682,26 @@ export default function UserManagement({ onUserCreated }: UserManagementProps) {
                       type="button"
                       variant="outline"
                       onClick={() => setShowForm(false)}
+                      disabled={saving}
                     >
                       Cancelar
                     </Button>
                     <Button
                       onClick={handleSaveUser}
                       className="bg-biobox-green hover:bg-biobox-green-dark"
-                      disabled={
-                        !formData.name ||
-                        !formData.email ||
-                        (!selectedUser && !formData.password)
-                      }
+                      disabled={saving}
                     >
-                      <Save className="h-4 w-4 mr-2" />
-                      Salvar
+                      {saving ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Salvando...
+                        </>
+                      ) : (
+                        <>
+                          <Save className="h-4 w-4 mr-2" />
+                          Salvar
+                        </>
+                      )}
                     </Button>
                   </div>
                 </CardContent>
@@ -527,11 +714,9 @@ export default function UserManagement({ onUserCreated }: UserManagementProps) {
               <Card className="w-full max-w-2xl bg-card border-border my-4">
                 <CardHeader>
                   <div className="flex items-center justify-between">
-                    <CardTitle className="flex items-center space-x-2 text-sm sm:text-base">
-                      <Shield className="h-4 w-4 sm:h-5 sm:w-5" />
-                      <span className="truncate">
-                        Permissões - {permissionUser.name}
-                      </span>
+                    <CardTitle className="flex items-center space-x-2">
+                      <Shield className="h-5 w-5" />
+                      <span>Permissões - {permissionUser.name}</span>
                     </CardTitle>
                     <Button
                       variant="ghost"
@@ -556,11 +741,11 @@ export default function UserManagement({ onUserCreated }: UserManagementProps) {
                           }
                           className="mt-1"
                         />
-                        <div className="flex-1 min-w-0">
+                        <div className="flex-1">
                           <div className="font-medium text-sm">
                             {permission.name}
                           </div>
-                          <div className="text-xs text-muted-foreground break-words">
+                          <div className="text-xs text-muted-foreground">
                             <span className="font-semibold">Módulo:</span>{" "}
                             {permission.module}
                             <br />
@@ -571,18 +756,17 @@ export default function UserManagement({ onUserCreated }: UserManagementProps) {
                       </div>
                     ))}
                   </div>
-                  <div className="flex flex-col sm:flex-row justify-end gap-2 sm:space-x-4 pt-4 border-t">
+                  <div className="flex justify-end space-x-4 pt-4 border-t">
                     <Button
                       type="button"
                       variant="outline"
                       onClick={() => setShowPermissions(false)}
-                      className="w-full sm:w-auto"
                     >
                       Cancelar
                     </Button>
                     <Button
                       onClick={handleSavePermissions}
-                      className="bg-biobox-green hover:bg-biobox-green-dark w-full sm:w-auto"
+                      className="bg-biobox-green hover:bg-biobox-green-dark"
                     >
                       <Save className="h-4 w-4 mr-2" />
                       Salvar Permissões

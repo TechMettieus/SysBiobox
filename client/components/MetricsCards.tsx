@@ -1,3 +1,4 @@
+// client/components/MetricsCards.tsx
 import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -90,37 +91,33 @@ export default function MetricsCards() {
     delayedOrders: 0,
     readyOrders: 0,
     monthlyRevenue: 0,
+    completedToday: 0,
+    pendingValue: 0,
   });
-  const [monthlyTarget, setMonthlyTarget] = useState(180000);
 
-  const { getOrders } = useSupabase();
+  const { getOrders, getCustomers } = useSupabase();
 
   useEffect(() => {
-    loadSettings();
     loadMetrics();
   }, []);
-
-  const loadSettings = async () => {
-    try {
-      const storedSettings = localStorage.getItem("biobox_settings_system");
-      if (storedSettings) {
-        const settings = JSON.parse(storedSettings);
-        if (settings.monthlyRevenueTarget) {
-          setMonthlyTarget(settings.monthlyRevenueTarget);
-        }
-      }
-    } catch (error) {
-      console.error("Erro ao carregar configurações:", error);
-    }
-  };
 
   const loadMetrics = async () => {
     try {
       setLoading(true);
-      const orders = await getOrders();
+      
+      // Buscar dados reais
+      const [orders, customers] = await Promise.all([
+        getOrders(),
+        getCustomers()
+      ]);
 
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+      // Calcular métricas
       const activeOrders = orders.filter((order) =>
-        ["pending", "confirmed", "in_production", "quality_check"].includes(
+        ["pending", "confirmed", "in_production", "quality_check", "ready"].includes(
           order.status,
         ),
       ).length;
@@ -139,7 +136,6 @@ export default function MetricsCards() {
         (order) => order.status === "ready",
       ).length;
 
-      const now = new Date();
       const delayedOrders = orders.filter(
         (order) =>
           order.delivery_date &&
@@ -147,9 +143,28 @@ export default function MetricsCards() {
           !["delivered", "cancelled"].includes(order.status),
       ).length;
 
-      const monthlyRevenue = orders
-        .filter((order) => order.status !== "cancelled")
-        .reduce((sum, order) => sum + (order.total_amount || 0), 0);
+      // Calcular receita do mês
+      const monthlyOrders = orders.filter(order => {
+        const orderDate = new Date(order.created_at);
+        return orderDate >= monthStart && order.status !== "cancelled";
+      });
+      
+      const monthlyRevenue = monthlyOrders.reduce(
+        (sum, order) => sum + (order.total_amount || 0), 
+        0
+      );
+
+      // Pedidos concluídos hoje
+      const completedToday = orders.filter(order => {
+        if (order.status !== "delivered") return false;
+        const deliveryDate = order.completed_date ? new Date(order.completed_date) : null;
+        return deliveryDate && deliveryDate >= today;
+      }).length;
+
+      // Valor pendente de produção
+      const pendingValue = orders
+        .filter(o => ["pending", "confirmed", "in_production"].includes(o.status))
+        .reduce((sum, o) => sum + (o.total_amount || 0), 0);
 
       setMetrics({
         activeOrders,
@@ -158,6 +173,8 @@ export default function MetricsCards() {
         delayedOrders,
         readyOrders,
         monthlyRevenue,
+        completedToday,
+        pendingValue
       });
     } catch (error) {
       console.error("Erro ao carregar métricas:", error);
@@ -166,9 +183,14 @@ export default function MetricsCards() {
     }
   };
 
-  const revenuePercentage = Math.round(
-    (metrics.monthlyRevenue / monthlyTarget) * 100,
-  );
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(value);
+  };
 
   if (loading) {
     return (
@@ -187,50 +209,51 @@ export default function MetricsCards() {
     );
   }
 
+  // Calcular tendências (comparando com período anterior)
+  const revenueTarget = 180000; // Meta mensal configurável
+  const revenuePercentage = Math.round((metrics.monthlyRevenue / revenueTarget) * 100);
+  const revenueTrend = revenuePercentage >= 50 ? "up" : "down";
+
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
       <MetricCard
         title="Pedidos Ativos"
         value={metrics.activeOrders}
-        subtitle={`${metrics.urgentOrders} urgentes`}
+        subtitle={`${metrics.urgentOrders} urgente${metrics.urgentOrders !== 1 ? 's' : ''}`}
         icon={Calendar}
         trend={metrics.activeOrders > 0 ? "up" : "neutral"}
-        trendValue={`${metrics.activeOrders} em andamento`}
+        trendValue={metrics.delayedOrders > 0 ? `${metrics.delayedOrders} atrasado${metrics.delayedOrders !== 1 ? 's' : ''}` : "Sem atrasos"}
         color="blue"
       />
+      
       <MetricCard
         title="Em Produção"
         value={metrics.inProductionOrders}
-        subtitle="Pedidos sendo fabricados"
+        subtitle="Sendo fabricados agora"
         icon={Package}
-        trend={metrics.delayedOrders > 0 ? "down" : "neutral"}
-        trendValue={
-          metrics.delayedOrders > 0
-            ? `${metrics.delayedOrders} atrasados`
-            : "Nenhum atraso"
-        }
+        trend={metrics.inProductionOrders > 0 ? "up" : "neutral"}
+        trendValue={`${metrics.readyOrders} pronto${metrics.readyOrders !== 1 ? 's' : ''} para entrega`}
         color="orange"
       />
+      
       <MetricCard
-        title="Prontos p/ Entrega"
-        value={metrics.readyOrders}
-        subtitle="Aguardando transporte"
+        title="Concluídos Hoje"
+        value={metrics.completedToday}
+        subtitle="Entregas realizadas"
         icon={CheckCircle}
-        trend="up"
-        trendValue={`${metrics.readyOrders} prontos`}
+        trend={metrics.completedToday > 0 ? "up" : "neutral"}
+        trendValue={metrics.completedToday > 0 ? "Meta diária atingida" : "Nenhuma entrega hoje"}
         color="green"
       />
+      
       <MetricCard
-        title="Receita Total"
-        value={new Intl.NumberFormat("pt-BR", {
-          style: "currency",
-          currency: "BRL",
-        }).format(metrics.monthlyRevenue)}
-        subtitle={`Meta Mensal: ${new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(monthlyTarget)}`}
+        title="Receita Mensal"
+        value={formatCurrency(metrics.monthlyRevenue)}
+        subtitle={`Meta: ${formatCurrency(revenueTarget)}`}
         icon={DollarSign}
-        trend={revenuePercentage >= 50 ? "up" : "down"}
-        trendValue={`${revenuePercentage}% da meta mensal`}
-        color="green"
+        trend={revenueTrend}
+        trendValue={`${revenuePercentage}% da meta`}
+        color={revenuePercentage >= 80 ? "green" : revenuePercentage >= 50 ? "orange" : "red"}
       />
     </div>
   );
