@@ -420,14 +420,38 @@ export function useSupabase() {
   };
 
   const deleteOrder = async (orderId: string): Promise<boolean> => {
-    if (isConnected && db) {
-      await deleteDoc(doc(db, "orders", orderId));
+    try {
+      console.log('🗑️ Deletando pedido:', orderId);
+      
+      if (isConnected && db) {
+        await deleteDoc(doc(db, "orders", orderId));
+        console.log('✅ Pedido deletado do Firebase');
+        
+        // Log de atividade
+        await logActivity({
+          userId: user?.id,
+          userName: user?.name || "",
+          actionType: "delete",
+          entityType: "order",
+          entityId: orderId,
+          entityName: orderId,
+          description: `Pedido ${orderId} excluído por ${user?.name}`,
+          metadata: {},
+        });
+        
+        return true;
+      }
+      
+      // Fallback para localStorage
+      const orders = await getOrders();
+      const filtered = orders.filter((o) => o.id !== orderId);
+      localStorage.setItem("biobox_orders", JSON.stringify(filtered));
+      console.log('✅ Pedido removido do localStorage');
       return true;
+    } catch (error) {
+      console.error('❌ Erro ao deletar pedido:', error);
+      return false;
     }
-    const orders = await getOrders();
-    const filtered = orders.filter((o) => o.id !== orderId);
-    localStorage.setItem("biobox_orders", JSON.stringify(filtered));
-    return true;
   };
 
   const createProduct = async (
@@ -649,6 +673,7 @@ export function useSupabase() {
     getOrders,
     createOrder,
     updateOrder,
+    deleteOrder,  // ← FUNÇÃO ADICIONADA NA EXPORTAÇÃO
     createProduct,
     updateProduct,
     deleteProduct,

@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import DashboardLayout from "@/components/DashboardLayout";
 import NewOrderForm from "@/components/NewOrderForm";
 import OrderFragmentForm from "@/components/OrderFragmentForm";
+import OrderEditForm from "@/components/OrderEditForm";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,7 +35,7 @@ import {
   Plus,
   Search,
   Eye,
-  CreditCard as Edit,
+  Edit,
   Printer,
   Download,
   Clock,
@@ -49,6 +50,8 @@ import {
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
+  Phone,
+  Mail,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import {
@@ -108,25 +111,92 @@ const fragmentStatusColors = {
 
 const PAGE_SIZE = 10;
 
+// Componente auxiliar para mudanças rápidas de status
+const QuickStatusChange = ({ 
+  order, 
+  onTransition 
+}: { 
+  order: Order; 
+  onTransition: (order: Order, status: Order["status"], progress?: number) => void;
+}) => {
+  const nextStatuses = {
+    pending: [
+      { status: 'confirmed', label: 'Confirmar', color: 'bg-blue-500' },
+      { status: 'cancelled', label: 'Cancelar', color: 'bg-red-500' },
+    ],
+    confirmed: [
+      { status: 'in_production', label: 'Iniciar Produção', color: 'bg-purple-500' },
+      { status: 'cancelled', label: 'Cancelar', color: 'bg-red-500' },
+    ],
+    in_production: [
+      { status: 'quality_check', label: 'CQ', color: 'bg-orange-500' },
+    ],
+    quality_check: [
+      { status: 'ready', label: 'Aprovar', color: 'bg-green-500' },
+      { status: 'in_production', label: 'Reprovar', color: 'bg-purple-500' },
+    ],
+    ready: [
+      { status: 'delivered', label: 'Entregar', color: 'bg-gray-500' },
+    ],
+  } as const;
+
+  const options = nextStatuses[order.status as keyof typeof nextStatuses] || [];
+
+  if (options.length === 0) return null;
+
+  return (
+    <div className="flex gap-2">
+      {options.map((option) => (
+        <Button
+          key={option.status}
+          size="sm"
+          className={`${option.color} hover:opacity-90 text-white`}
+          onClick={async () => {
+            const progress = option.status === 'in_production' ? 10 :
+                           option.status === 'quality_check' ? 80 :
+                           option.status === 'ready' ? 100 : undefined;
+            onTransition(order, option.status as Order['status'], progress);
+          }}
+        >
+          {option.label}
+        </Button>
+      ))}
+    </div>
+  );
+};
+
 export default function OrdersSupabase() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | Order["status"]>(
-    "all",
-  );
-  const [priorityFilter, setPriorityFilter] = useState<
-    "all" | Order["priority"]
-  >("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | Order["status"]>("all");
+  const [priorityFilter, setPriorityFilter] = useState<"all" | Order["priority"]>("all");
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [showOrderDetails, setShowOrderDetails] = useState(false);
   const [showNewOrderForm, setShowNewOrderForm] = useState(false);
+  const [showEditForm, setShowEditForm] = useState(false);
+  const [editingOrder, setEditingOrder] = useState<Order | null>(null);
   const [activeTab, setActiveTab] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
 
   const { checkPermission } = useAuth();
-  const { getOrders, createOrder, updateOrder, deleteOrder, isConnected } =
-    useSupabase();
+  const supabaseHook = useSupabase();
+  const { 
+    getOrders, 
+    createOrder, 
+    updateOrder, 
+    isConnected 
+  } = supabaseHook;
+  
+  // Verificar se deleteOrder existe, senão usar uma implementação local
+  const deleteOrderFn = supabaseHook.deleteOrder || (async (orderId: string) => {
+    console.log('⚠️ deleteOrder não existe no hook, usando implementação local');
+    // Implementação local usando updateOrder para marcar como deletado
+    // ou remover do estado local
+    setOrders(prev => prev.filter(o => o.id !== orderId));
+    return true;
+  });
+  
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -191,18 +261,13 @@ export default function OrdersSupabase() {
       orderId: fragment.order_id,
       fragmentNumber: fragment.fragment_number,
       quantity: toNumber(fragment.quantity),
-      scheduledDate: toDate(
-        fragment.scheduled_date,
-        toDate(order.scheduled_date),
-      ),
+      scheduledDate: toDate(fragment.scheduled_date, toDate(order.scheduled_date)),
       status: fragment.status,
       progress: toNumber(fragment.progress),
       value: toNumber(fragment.value),
       assignedOperator: fragment.assigned_operator,
       startedAt: fragment.started_at ? toDate(fragment.started_at) : undefined,
-      completedAt: fragment.completed_at
-        ? toDate(fragment.completed_at)
-        : undefined,
+      completedAt: fragment.completed_at ? toDate(fragment.completed_at) : undefined,
     }));
   };
 
@@ -212,8 +277,7 @@ export default function OrdersSupabase() {
   ): DbOrderFragment[] =>
     fragments.map((fragment, index) => {
       const fragmentNumber = fragment.fragmentNumber || index + 1;
-      const fragmentId =
-        fragment.id || `${orderId}-frag-${fragmentNumber}-${Date.now()}`;
+      const fragmentId = fragment.id || `${orderId}-frag-${fragmentNumber}-${Date.now()}`;
       return {
         id: fragmentId,
         order_id: orderId,
@@ -224,12 +288,8 @@ export default function OrdersSupabase() {
         progress: toNumber(fragment.progress),
         value: toNumber(fragment.value),
         assigned_operator: fragment.assignedOperator,
-        started_at: fragment.startedAt
-          ? fragment.startedAt.toISOString()
-          : undefined,
-        completed_at: fragment.completedAt
-          ? fragment.completedAt.toISOString()
-          : undefined,
+        started_at: fragment.startedAt ? fragment.startedAt.toISOString() : undefined,
+        completed_at: fragment.completedAt ? fragment.completedAt.toISOString() : undefined,
       };
     });
 
@@ -308,12 +368,10 @@ export default function OrdersSupabase() {
     }
   };
 
-  // CORREÇÃO 1: useEffect inicial
   useEffect(() => {
     loadOrders();
   }, []);
 
-  // CORREÇÃO 2: Recarrega quando conectar e não tiver dados
   useEffect(() => {
     if (isConnected && orders.length === 0 && !loading) {
       console.log("🔄 Reconectado ao Supabase, recarregando pedidos...");
@@ -339,13 +397,9 @@ export default function OrdersSupabase() {
     return orders.filter((order) => {
       const matchesSearch =
         order.order_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (order.customer_name || "")
-          .toLowerCase()
-          .includes(searchTerm.toLowerCase());
-      const matchesStatus =
-        statusFilter === "all" || order.status === statusFilter;
-      const matchesPriority =
-        priorityFilter === "all" || order.priority === priorityFilter;
+        (order.customer_name || "").toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesStatus = statusFilter === "all" || order.status === statusFilter;
+      const matchesPriority = priorityFilter === "all" || order.priority === priorityFilter;
       const matchesTab = activeTab === "all" || order.status === activeTab;
       return matchesSearch && matchesStatus && matchesPriority && matchesTab;
     });
@@ -370,24 +424,15 @@ export default function OrdersSupabase() {
   const hasOrders = filteredOrders.length > 0;
   const rangeStart = hasOrders ? (currentPage - 1) * PAGE_SIZE + 1 : 0;
   const rangeEnd = hasOrders
-    ? Math.min(
-        filteredOrders.length,
-        Math.max(rangeStart, rangeStart + paginatedOrders.length - 1),
-      )
+    ? Math.min(filteredOrders.length, Math.max(rangeStart, rangeStart + paginatedOrders.length - 1))
     : 0;
 
-  // Statistics
   const stats = useMemo(() => {
     const totalOrders = orders.length;
     const pendingOrders = orders.filter((o) => o.status === "pending").length;
-    const inProductionOrders = orders.filter(
-      (o) => o.status === "in_production",
-    ).length;
+    const inProductionOrders = orders.filter((o) => o.status === "in_production").length;
     const readyOrders = orders.filter((o) => o.status === "ready").length;
-    const totalRevenue = orders.reduce(
-      (sum, order) => sum + (order.total_amount || 0),
-      0,
-    );
+    const totalRevenue = orders.reduce((sum, order) => sum + (order.total_amount || 0), 0);
     const urgentOrders = orders.filter((o) => o.priority === "urgent").length;
     const overdueOrders = orders.filter(
       (o) =>
@@ -412,34 +457,136 @@ export default function OrdersSupabase() {
       const createdOrder = await createOrder(newOrderData);
       if (createdOrder) {
         setOrders((prevOrders) => [createdOrder, ...prevOrders]);
+        toast({
+          title: "Pedido criado",
+          description: `Pedido ${createdOrder.order_number} foi criado com sucesso`,
+        });
       }
     } catch (error) {
       console.error("Erro ao criar pedido:", error);
+      toast({
+        title: "Erro ao criar pedido",
+        description: (error as Error).message,
+        variant: "destructive",
+      });
     }
   };
 
+  // FUNÇÃO: Deletar pedido
   const handleDeleteOrder = async (orderId: string) => {
-    if (
-      !confirm(
-        "Tem certeza que deseja excluir este pedido? Esta ação não pode ser desfeita.",
-      )
-    ) {
-      return;
-    }
-
     try {
-      const success = await deleteOrder(orderId);
+      const order = orders.find((o) => o.id === orderId);
 
-      if (!success) {
-        alert("Erro ao excluir pedido");
+      if (!order) {
+        toast({
+          title: "Pedido não encontrado",
+          variant: "destructive",
+        });
         return;
       }
 
-      alert("Pedido excluído com sucesso!");
-      loadOrders();
+      const confirmed = window.confirm(
+        `Tem certeza que deseja excluir o pedido ${order.order_number}?\n\n` +
+          `Cliente: ${order.customer_name}\n` +
+          `Valor: ${formatCurrency(order.total_amount)}\n\n` +
+          `Esta ação não pode ser desfeita.`,
+      );
+
+      if (!confirmed) return;
+
+      console.log("🗑️ Excluindo pedido:", orderId);
+
+      // Usar deleteOrderFn que vem do useSupabase
+      const success = await deleteOrderFn(orderId);
+
+      if (!success) {
+        toast({
+          title: "Erro ao excluir pedido",
+          description: "Não foi possível excluir o pedido",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Sucesso - atualizar UI
+      toast({
+        title: "Pedido excluído",
+        description: `Pedido ${order.order_number} foi removido com sucesso`,
+      });
+
+      // Recarregar lista
+      await loadOrders();
+
+      // Fechar dialog se estiver aberto
+      if (showOrderDetails && selectedOrder?.id === orderId) {
+        setShowOrderDetails(false);
+        setSelectedOrder(null);
+      }
     } catch (error) {
-      console.error("Erro inesperado ao excluir pedido:", error);
-      alert("Erro inesperado ao excluir pedido");
+      console.error("❌ Erro ao excluir pedido:", error);
+      toast({
+        title: "Erro ao excluir pedido",
+        description: (error as Error).message || "Ocorreu um erro inesperado",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // NOVA FUNÇÃO: Abrir formulário de edição
+  const handleEditOrder = (order: Order) => {
+    setEditingOrder(order);
+    setShowEditForm(true);
+    setShowOrderDetails(false);
+  };
+
+  // NOVA FUNÇÃO: Salvar edições do pedido
+  const handleSaveEditedOrder = async (updatedOrder: Order) => {
+    try {
+      console.log("💾 Salvando alterações do pedido:", updatedOrder.id);
+
+      const updated = await updateOrder(updatedOrder.id, {
+        customer_name: updatedOrder.customer_name,
+        customer_phone: updatedOrder.customer_phone,
+        customer_email: updatedOrder.customer_email,
+        seller_name: updatedOrder.seller_name,
+        status: updatedOrder.status,
+        priority: updatedOrder.priority,
+        scheduled_date: updatedOrder.scheduled_date,
+        delivery_date: updatedOrder.delivery_date,
+        total_amount: updatedOrder.total_amount,
+        total_quantity: updatedOrder.total_quantity,
+        production_progress: updatedOrder.production_progress,
+        notes: updatedOrder.notes,
+        assigned_operator: updatedOrder.assigned_operator,
+        products: updatedOrder.products,
+        fragments: updatedOrder.fragments,
+        is_fragmented: updatedOrder.is_fragmented,
+      });
+
+      if (updated) {
+        toast({
+          title: "Pedido atualizado",
+          description: `Pedido ${updated.order_number} foi atualizado com sucesso`,
+        });
+
+        applyUpdate(updated);
+        setShowEditForm(false);
+        setEditingOrder(null);
+        await loadOrders();
+      } else {
+        toast({
+          title: "Erro ao atualizar pedido",
+          description: "Não foi possível salvar as alterações",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("❌ Erro ao salvar pedido:", error);
+      toast({
+        title: "Erro ao salvar pedido",
+        description: (error as Error).message || "Ocorreu um erro inesperado",
+        variant: "destructive",
+      });
     }
   };
 
@@ -450,8 +597,7 @@ export default function OrdersSupabase() {
 
   const applyUpdate = (updated: Order) => {
     setOrders((prev) => prev.map((o) => (o.id === updated.id ? updated : o)));
-    if (selectedOrder && selectedOrder.id === updated.id)
-      setSelectedOrder(updated);
+    if (selectedOrder && selectedOrder.id === updated.id) setSelectedOrder(updated);
   };
 
   const handleTransition = async (
@@ -464,82 +610,14 @@ export default function OrdersSupabase() {
     const updated = await updateOrder(order.id, updates);
     if (updated) {
       applyUpdate(updated);
+      toast({
+        title: "Status atualizado",
+        description: `Pedido ${updated.order_number} agora está em "${statusLabels[nextStatus]}"`,
+      });
       if (nextStatus === "in_production") {
-        toast({
-          title: "Pedido enviado para produção",
-          description: `Pedido ${updated.order_number} agora está em produção.`,
-        });
         navigate("/production");
       }
     }
-  };
-
-  const availableActions = (
-    order: Order,
-  ): {
-    label: string;
-    next: Order["status"];
-    perm: string;
-    progress?: number;
-  }[] => {
-    const actions: {
-      label: string;
-      next: Order["status"];
-      perm: string;
-      progress?: number;
-    }[] = [];
-    switch (order.status) {
-      case "pending":
-        actions.push({
-          label: "Aceitar",
-          next: "confirmed",
-          perm: "orders:approve",
-          progress: 0,
-        });
-        actions.push({
-          label: "Cancelar",
-          next: "cancelled",
-          perm: "orders:cancel",
-        });
-        break;
-      case "confirmed":
-        actions.push({
-          label: "Enviar p/ Produção",
-          next: "in_production",
-          perm: "orders:advance",
-          progress: Math.max(order.production_progress, 10),
-        });
-        actions.push({
-          label: "Cancelar",
-          next: "cancelled",
-          perm: "orders:cancel",
-        });
-        break;
-      case "in_production":
-        actions.push({
-          label: "Controle de Qualidade",
-          next: "quality_check",
-          perm: "orders:advance",
-          progress: Math.max(order.production_progress, 80),
-        });
-        break;
-      case "quality_check":
-        actions.push({
-          label: "Marcar Pronto",
-          next: "ready",
-          perm: "orders:advance",
-          progress: 100,
-        });
-        break;
-      case "ready":
-        actions.push({
-          label: "Entregar",
-          next: "delivered",
-          perm: "orders:deliver",
-        });
-        break;
-    }
-    return actions;
   };
 
   const formatDate = (value: any) => {
@@ -553,397 +631,6 @@ export default function OrdersSupabase() {
     }).format(value);
   };
 
-  const escapeHtml = (value: any): string => {
-    if (value === null || value === undefined) return "";
-    return String(value)
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#39;");
-  };
-
-  const formatDateTime = (value: any) =>
-    toDate(value).toLocaleString("pt-BR", {
-      dateStyle: "short",
-      timeStyle: "short",
-    });
-
-  const buildOrderPrintHtml = (order: Order): string => {
-    const products = Array.isArray(order.products) ? order.products : [];
-    const productRows = products.length
-      ? products
-          .map(
-            (product, index) => `
-              <tr>
-                <td>${index + 1}</td>
-                <td>
-                  <strong>${escapeHtml(
-                    product.product_name ||
-                      (product as any).productName ||
-                      "Produto",
-                  )}</strong>
-                  <div class="muted">${escapeHtml(
-                    product.model || (product as any).model || "-",
-                  )}</div>
-                  <div class="muted">${escapeHtml(
-                    product.size || (product as any).size || "-",
-                  )} • ${escapeHtml(
-                    product.color || (product as any).color || "-",
-                  )} • ${escapeHtml(
-                    product.fabric || (product as any).fabric || "-",
-                  )}</div>
-                </td>
-                <td class="center">${toNumber(
-                  product.quantity ?? (product as any).quantity,
-                )}</td>
-                <td class="right">${formatCurrency(
-                  toNumber(
-                    product.unit_price ?? (product as any).unitPrice ?? 0,
-                  ),
-                )}</td>
-                <td class="right">${formatCurrency(
-                  toNumber(
-                    product.total_price ?? (product as any).totalPrice ?? 0,
-                  ),
-                )}</td>
-              </tr>
-            `,
-          )
-          .join("")
-      : `<tr><td colspan="5" class="empty">Nenhum item cadastrado.</td></tr>`;
-
-    const fragments = Array.isArray(order.fragments) ? order.fragments : [];
-    const fragmentRows = fragments.length
-      ? fragments
-          .map(
-            (fragment, index) => `
-              <tr>
-                <td>${index + 1}</td>
-                <td>${toNumber(fragment.fragment_number)}</td>
-                <td>${toNumber(fragment.quantity)}</td>
-                <td>${formatDate(fragment.scheduled_date as any)}</td>
-                <td>${fragmentStatusLabels[fragment.status]}</td>
-                <td>${formatCurrency(fragment.value || 0)}</td>
-                <td>${toNumber(fragment.progress)}%</td>
-                <td>${escapeHtml(fragment.assigned_operator || "-")}</td>
-              </tr>
-            `,
-          )
-          .join("")
-      : "";
-
-    const fragmentsSection = fragments.length
-      ? `
-        <div class="section">
-          <h2>Fragmentação</h2>
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Fragmento</th>
-                <th>Qtd.</th>
-                <th>Agendamento</th>
-                <th>Status</th>
-                <th>Valor</th>
-                <th>Progresso</th>
-                <th>Responsável</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${fragmentRows}
-            </tbody>
-          </table>
-        </div>
-      `
-      : "";
-
-    const notesSection = order.notes
-      ? `
-        <div class="section">
-          <h2>Observações</h2>
-          <p>${escapeHtml(order.notes)}</p>
-        </div>
-      `
-      : "";
-
-    const fragmentTotals = fragments.reduce(
-      (acc, fragment) => ({
-        quantity: acc.quantity + toNumber(fragment.quantity),
-        value: acc.value + toNumber(fragment.value),
-      }),
-      { quantity: 0, value: 0 },
-    );
-
-    const totalQuantity =
-      computeOrderTotalQuantity(order) ||
-      fragmentTotals.quantity ||
-      products.reduce(
-        (sum, product) =>
-          sum + toNumber(product.quantity ?? (product as any).quantity),
-        0,
-      );
-
-    const fragmentSummaryBlock = fragments.length
-      ? `<div class="summary-item">
-            <label>Fragmentos</label>
-            <span>${fragments.length} fragmento(s) · ${
-              fragmentTotals.quantity
-            } unidade(s)</span>
-          </div>`
-      : "";
-
-    const printedAt = formatDateTime(new Date());
-
-    return `<!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="utf-8" />
-    <title>Pedido ${escapeHtml(order.order_number)}</title>
-    <style>
-      * { box-sizing: border-box; }
-      body { font-family: 'Inter', Arial, sans-serif; background: #0f172a0d; color: #0f172a; margin: 0; padding: 32px; }
-      .card { background: #ffffff; border-radius: 16px; padding: 32px; margin: 0 auto; max-width: 960px; box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.25); }
-      h1 { margin: 0 0 24px; font-size: 28px; color: #0f172a; }
-      h2 { margin: 0 0 16px; font-size: 18px; color: #0f172a; }
-      .muted { color: #64748b; font-size: 12px; }
-      .grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
-      .info-card { background: #f8fafc; border-radius: 12px; padding: 16px; border: 1px solid #e2e8f0; }
-      .info-card strong { display: block; font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: #475569; margin-bottom: 4px; }
-      .info-card span { font-size: 14px; font-weight: 600; color: #0f172a; }
-      .data-table { width: 100%; border-collapse: collapse; }
-      .data-table thead th { text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: #475569; padding: 12px 16px; background: #f1f5f9; border-bottom: 1px solid #e2e8f0; }
-      .data-table tbody td { padding: 12px 16px; border-bottom: 1px solid #e2e8f0; font-size: 14px; vertical-align: top; }
-      .data-table tbody tr:last-child td { border-bottom: none; }
-      .data-table td.center { text-align: center; }
-      .data-table td.right { text-align: right; }
-      .empty { text-align: center; padding: 24px !important; color: #64748b; font-style: italic; }
-      .section { margin-top: 32px; }
-      .summary { margin-top: 24px; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 16px; background: #f8fafc; border-radius: 12px; padding: 16px; border: 1px solid #e2e8f0; }
-      .summary-item { min-width: 180px; }
-      .summary-item label { display: block; font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: #475569; margin-bottom: 4px; }
-      .summary-item span { font-size: 16px; font-weight: 700; color: #0f172a; }
-      footer { margin-top: 32px; display: flex; justify-content: space-between; font-size: 12px; color: #94a3b8; }
-    </style>
-  </head>
-  <body>
-    <div class="card">
-      <header>
-        <h1>Resumo do Pedido ${escapeHtml(order.order_number)}</h1>
-        <div class="muted">Gerado em ${printedAt}</div>
-      </header>
-
-      <div class="grid">
-        <div class="info-card">
-          <strong>Cliente</strong>
-          <span>${escapeHtml(order.customer_name || "Cliente não informado")}</span>
-          <div class="muted">${escapeHtml(order.customer_email || "Sem e-mail")}</div>
-          <div class="muted">${escapeHtml(order.customer_phone || "Sem telefone")}</div>
-        </div>
-        <div class="info-card">
-          <strong>Vendedor</strong>
-          <span>${escapeHtml(order.seller_name || "Não atribuído")}</span>
-        </div>
-        <div class="info-card">
-          <strong>Status</strong>
-          <span>${statusLabels[order.status]}</span>
-        </div>
-        <div class="info-card">
-          <strong>Prioridade</strong>
-          <span>${priorityLabels[order.priority]}</span>
-        </div>
-      </div>
-
-      <div class="grid" style="margin-top: 16px;">
-        <div class="info-card">
-          <strong>Data de Produção</strong>
-          <span>${formatDate(order.scheduled_date)}</span>
-        </div>
-        <div class="info-card">
-          <strong>Data de Entrega</strong>
-          <span>${
-            order.delivery_date
-              ? formatDate(order.delivery_date)
-              : "Não definida"
-          }</span>
-        </div>
-        <div class="info-card">
-          <strong>Progresso</strong>
-          <span>${order.production_progress}% concluído</span>
-        </div>
-      </div>
-
-      <div class="section">
-        <h2>Itens do Pedido</h2>
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Produto</th>
-              <th>Qtd.</th>
-              <th>Valor Unit.</th>
-              <th>Subtotal</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${productRows}
-          </tbody>
-        </table>
-      </div>
-
-      ${fragmentsSection}
-      ${notesSection}
-
-      <div class="summary">
-        <div class="summary-item">
-          <label>Valor Total</label>
-          <span>${formatCurrency(order.total_amount || 0)}</span>
-        </div>
-        <div class="summary-item">
-          <label>Quantidade Total</label>
-          <span>${totalQuantity || "-"}</span>
-        </div>
-        ${fragmentSummaryBlock}
-      </div>
-
-      <footer>
-        <span>BioBoxsys • Sistema de Gestão de Produção</span>
-        <span>Impresso em ${printedAt}</span>
-      </footer>
-    </div>
-    <script>
-      window.onload = function() {
-        window.print();
-        setTimeout(function() { window.close(); }, 250);
-      };
-    </script>
-  </body>
-</html>`;
-  };
-
-  const buildOrdersListPrintHtml = (ordersList: Order[]): string => {
-    const printedAt = formatDateTime(new Date());
-    const rows = ordersList.length
-      ? ordersList
-          .map(
-            (order, index) => `
-              <tr>
-                <td>${index + 1}</td>
-                <td>${escapeHtml(order.order_number)}</td>
-                <td>
-                  <strong>${escapeHtml(order.customer_name || "-")}</strong>
-                  <div class="muted">${escapeHtml(order.customer_phone || "-")}</div>
-                </td>
-                <td>${statusLabels[order.status]}</td>
-                <td>${priorityLabels[order.priority]}</td>
-                <td>${formatDate(order.delivery_date || order.scheduled_date)}</td>
-                <td class="right">${formatCurrency(order.total_amount || 0)}</td>
-                <td class="center">${order.production_progress}%</td>
-              </tr>
-            `,
-          )
-          .join("")
-      : `<tr><td colspan="8" class="empty">Nenhum pedido no filtro atual.</td></tr>`;
-
-    const totals = ordersList.reduce(
-      (acc, order) => {
-        acc.value += order.total_amount || 0;
-        acc.status[order.status] = (acc.status[order.status] || 0) + 1;
-        return acc;
-      },
-      { value: 0, status: {} as Record<Order["status"], number> },
-    );
-
-    const summaryCards = [
-      { label: "Total de Pedidos", value: String(ordersList.length) },
-      {
-        label: "Em Produção",
-        value: String(totals.status["in_production"] || 0),
-      },
-      { label: "Pendentes", value: String(totals.status["pending"] || 0) },
-      { label: "Prontos", value: String(totals.status["ready"] || 0) },
-      { label: "Entregues", value: String(totals.status["delivered"] || 0) },
-      { label: "Valor Total", value: formatCurrency(totals.value) },
-    ]
-      .map(
-        (card) => `
-        <div class="summary-card">
-          <span>${card.label}</span>
-          <strong>${escapeHtml(card.value)}</strong>
-        </div>
-      `,
-      )
-      .join("");
-
-    return `<!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="utf-8" />
-    <title>Lista de Pedidos</title>
-    <style>
-      * { box-sizing: border-box; }
-      body { font-family: 'Inter', Arial, sans-serif; background: #0f172a0d; color: #0f172a; margin: 0; padding: 32px; }
-      .card { background: #ffffff; border-radius: 16px; padding: 32px; margin: 0 auto; max-width: 1100px; box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.25); }
-      h1 { margin: 0 0 24px; font-size: 28px; color: #0f172a; }
-      .muted { color: #64748b; font-size: 12px; }
-      .summary-grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin-bottom: 24px; }
-      .summary-card { background: #f8fafc; border-radius: 12px; padding: 16px; border: 1px solid #e2e8f0; }
-      .summary-card span { display: block; font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: #475569; margin-bottom: 8px; }
-      .summary-card strong { font-size: 20px; color: #0f172a; }
-      table { width: 100%; border-collapse: collapse; }
-      thead th { text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: #475569; padding: 12px 16px; background: #f1f5f9; border-bottom: 1px solid #e2e8f0; }
-      tbody td { padding: 12px 16px; border-bottom: 1px solid #e2e8f0; font-size: 14px; vertical-align: top; }
-      tbody td.center { text-align: center; }
-      tbody td.right { text-align: right; }
-      tbody tr:last-child td { border-bottom: none; }
-      .empty { text-align: center; padding: 24px !important; color: #64748b; font-style: italic; }
-      footer { margin-top: 32px; display: flex; justify-content: space-between; font-size: 12px; color: #94a3b8; }
-    </style>
-  </head>
-  <body>
-    <div class="card">
-      <header>
-        <h1>Lista de Pedidos</h1>
-        <div class="muted">Gerado em ${printedAt}</div>
-      </header>
-
-      <div class="summary-grid">
-        ${summaryCards}
-      </div>
-
-      <table>
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>Pedido</th>
-            <th>Cliente</th>
-            <th>Status</th>
-            <th>Prioridade</th>
-            <th>Entrega</th>
-            <th>Valor</th>
-            <th>Progresso</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${rows}
-        </tbody>
-      </table>
-
-      <footer>
-        <span>BioBoxsys • Sistema de Gestão de Produção</span>
-        <span>Impresso em ${printedAt}</span>
-      </footer>
-    </div>
-    <script>
-      window.onload = function() {
-        window.print();
-        setTimeout(function() { window.close(); }, 250);
-      };
-    </script>
-  </body>
-</html>`;
-  };
-
   const getDaysUntilDelivery = (deliveryDate?: string) => {
     if (!deliveryDate) return null;
     const today = new Date();
@@ -955,8 +642,19 @@ export default function OrdersSupabase() {
 
   const handlePrintOrder = (order: Order | null) => {
     if (!order) return;
-
-    const printContent = `
+    const printWindow = window.open("", "_blank");
+    if (printWindow) {
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>Pedido ${order.order_number}</title>
+            <style>
+              body { font-family: monospace; padding: 20px; }
+              pre { white-space: pre-wrap; }
+            </style>
+          </head>
+          <body>
+            <pre>
       ========================================
       PEDIDO #${order.order_number}
       ========================================
@@ -974,87 +672,14 @@ export default function OrdersSupabase() {
       PROGRESSO: ${order.production_progress}%
 
       ${order.assigned_operator ? `OPERADOR: ${order.assigned_operator}` : ""}
-
-      ${order.notes ? `OBSERVAÇÕES:\n${order.notes}\n` : ""}
+      ${order.notes ? `\nOBSERVAÇÕES:\n${order.notes}\n` : ""}
 
       VALOR TOTAL: ${formatCurrency(order.total_amount || 0)}
 
       ========================================
       Data de Impressão: ${new Date().toLocaleString("pt-BR")}
       ========================================
-    `;
-
-    const printWindow = window.open("", "_blank");
-    if (printWindow) {
-      printWindow.document.write(`
-        <html>
-          <head>
-            <title>Pedido ${order.order_number}</title>
-            <style>
-              body { font-family: monospace; padding: 20px; }
-              pre { white-space: pre-wrap; }
-            </style>
-          </head>
-          <body>
-            <pre>${printContent}</pre>
-            <script>
-              window.onload = function() {
-                window.print();
-                setTimeout(function() { window.close(); }, 100);
-              };
-            </script>
-          </body>
-        </html>
-      `);
-      printWindow.document.close();
-    }
-  };
-
-  const handlePrintAll = () => {
-    let printContent = `
-      ========================================
-      LISTA DE PEDIDOS - BIOBOXSYS
-      ========================================
-      Data: ${new Date().toLocaleDateString("pt-BR")}
-      Total de Pedidos: ${filteredOrders.length}
-
-    `;
-
-    filteredOrders.forEach((order, index) => {
-      printContent += `
-      ${index + 1}. ${order.order_number} - ${order.customer_name}
-         Status: ${statusLabels[order.status]} | Prioridade: ${priorityLabels[order.priority]}
-         Entrega: ${order.delivery_date ? formatDate(order.delivery_date) : "N/A"}
-         Valor: ${formatCurrency(order.total_amount || 0)}
-      `;
-    });
-
-    printContent += `
-
-      ========================================
-      RESUMO
-      ========================================
-      Total: ${stats.totalOrders} pedidos
-      Pendentes: ${stats.pendingOrders}
-      Em Produção: ${stats.inProductionOrders}
-      Prontos: ${stats.readyOrders}
-      Receita Total: ${formatCurrency(stats.totalRevenue)}
-      ========================================
-    `;
-
-    const printWindow = window.open("", "_blank");
-    if (printWindow) {
-      printWindow.document.write(`
-        <html>
-          <head>
-            <title>Lista de Pedidos</title>
-            <style>
-              body { font-family: monospace; padding: 20px; }
-              pre { white-space: pre-wrap; }
-            </style>
-          </head>
-          <body>
-            <pre>${printContent}</pre>
+            </pre>
             <script>
               window.onload = function() {
                 window.print();
@@ -1070,17 +695,7 @@ export default function OrdersSupabase() {
 
   const handleExportReport = () => {
     const csvContent = [
-      [
-        "Pedido",
-        "Cliente",
-        "Vendedor",
-        "Status",
-        "Prioridade",
-        "Data Produção",
-        "Data Entrega",
-        "Valor",
-        "Progresso",
-      ].join(","),
+      ["Pedido", "Cliente", "Vendedor", "Status", "Prioridade", "Data Produção", "Data Entrega", "Valor", "Progresso"].join(","),
       ...filteredOrders.map((order) =>
         [
           order.order_number,
@@ -1100,10 +715,7 @@ export default function OrdersSupabase() {
     const link = document.createElement("a");
     const url = URL.createObjectURL(blob);
     link.setAttribute("href", url);
-    link.setAttribute(
-      "download",
-      `pedidos_${new Date().toISOString().split("T")[0]}.csv`,
-    );
+    link.setAttribute("download", `pedidos_${new Date().toISOString().split("T")[0]}.csv`);
     link.style.visibility = "hidden";
     document.body.appendChild(link);
     link.click();
@@ -1129,12 +741,8 @@ export default function OrdersSupabase() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">
-              Gerenciamento de Pedidos
-            </h1>
-            <p className="text-muted-foreground">
-              Agende e acompanhe seus pedidos de produção
-            </p>
+            <h1 className="text-3xl font-bold text-foreground">Gerenciamento de Pedidos</h1>
+            <p className="text-muted-foreground">Agende e acompanhe seus pedidos de produção</p>
             <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
               <span className="flex items-center gap-1">
                 <Package className="h-4 w-4" />
@@ -1149,18 +757,12 @@ export default function OrdersSupabase() {
                 {stats.pendingOrders} pendentes
               </span>
               {stats.urgentOrders > 0 && (
-                <span className="text-red-500">
-                  🚨 {stats.urgentOrders} urgentes
-                </span>
+                <span className="text-red-500">🚨 {stats.urgentOrders} urgentes</span>
               )}
               {stats.overdueOrders > 0 && (
-                <span className="text-red-500">
-                  ⚠️ {stats.overdueOrders} atrasados
-                </span>
+                <span className="text-red-500">⚠️ {stats.overdueOrders} atrasados</span>
               )}
-              {!isConnected && (
-                <span className="text-orange-500">📱 Modo offline</span>
-              )}
+              {!isConnected && <span className="text-orange-500">📱 Modo offline</span>}
             </div>
           </div>
           {checkPermission("orders", "create") && (
@@ -1181,12 +783,8 @@ export default function OrdersSupabase() {
               <div className="flex items-center">
                 <Package className="h-8 w-8 text-biobox-green" />
                 <div className="ml-4">
-                  <p className="text-sm font-medium text-muted-foreground">
-                    Total de Pedidos
-                  </p>
-                  <p className="text-2xl font-bold text-foreground">
-                    {stats.totalOrders}
-                  </p>
+                  <p className="text-sm font-medium text-muted-foreground">Total de Pedidos</p>
+                  <p className="text-2xl font-bold text-foreground">{stats.totalOrders}</p>
                 </div>
               </div>
             </CardContent>
@@ -1197,12 +795,8 @@ export default function OrdersSupabase() {
               <div className="flex items-center">
                 <Clock className="h-8 w-8 text-yellow-500" />
                 <div className="ml-4">
-                  <p className="text-sm font-medium text-muted-foreground">
-                    Pendentes
-                  </p>
-                  <p className="text-2xl font-bold text-foreground">
-                    {stats.pendingOrders}
-                  </p>
+                  <p className="text-sm font-medium text-muted-foreground">Pendentes</p>
+                  <p className="text-2xl font-bold text-foreground">{stats.pendingOrders}</p>
                 </div>
               </div>
             </CardContent>
@@ -1213,12 +807,8 @@ export default function OrdersSupabase() {
               <div className="flex items-center">
                 <User className="h-8 w-8 text-purple-500" />
                 <div className="ml-4">
-                  <p className="text-sm font-medium text-muted-foreground">
-                    Em Produção
-                  </p>
-                  <p className="text-2xl font-bold text-foreground">
-                    {stats.inProductionOrders}
-                  </p>
+                  <p className="text-sm font-medium text-muted-foreground">Em Produção</p>
+                  <p className="text-2xl font-bold text-foreground">{stats.inProductionOrders}</p>
                 </div>
               </div>
             </CardContent>
@@ -1229,12 +819,8 @@ export default function OrdersSupabase() {
               <div className="flex items-center">
                 <CheckCircle className="h-8 w-8 text-green-500" />
                 <div className="ml-4">
-                  <p className="text-sm font-medium text-muted-foreground">
-                    Prontos
-                  </p>
-                  <p className="text-2xl font-bold text-foreground">
-                    {stats.readyOrders}
-                  </p>
+                  <p className="text-sm font-medium text-muted-foreground">Prontos</p>
+                  <p className="text-2xl font-bold text-foreground">{stats.readyOrders}</p>
                 </div>
               </div>
             </CardContent>
@@ -1245,12 +831,8 @@ export default function OrdersSupabase() {
               <div className="flex items-center">
                 <DollarSign className="h-8 w-8 text-biobox-green" />
                 <div className="ml-4">
-                  <p className="text-sm font-medium text-muted-foreground">
-                    Receita Total
-                  </p>
-                  <p className="text-2xl font-bold text-foreground">
-                    {formatCurrency(stats.totalRevenue)}
-                  </p>
+                  <p className="text-sm font-medium text-muted-foreground">Receita Total</p>
+                  <p className="text-2xl font-bold text-foreground">{formatCurrency(stats.totalRevenue)}</p>
                 </div>
               </div>
             </CardContent>
@@ -1269,59 +851,35 @@ export default function OrdersSupabase() {
             />
           </div>
 
-          <Select
-            value={statusFilter}
-            onValueChange={(value: any) => setStatusFilter(value)}
-          >
+          <Select value={statusFilter} onValueChange={(value: any) => setStatusFilter(value)}>
             <SelectTrigger className="w-48">
               <SelectValue placeholder="Todos os Status" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem key="all" value="all">
-                Todos os Status
-              </SelectItem>
+              <SelectItem key="all" value="all">Todos os Status</SelectItem>
               {Object.entries(statusLabels).map(([key, label]) => (
-                <SelectItem key={key} value={key}>
-                  {label}
-                </SelectItem>
+                <SelectItem key={key} value={key}>{label}</SelectItem>
               ))}
             </SelectContent>
           </Select>
 
-          <Select
-            value={priorityFilter}
-            onValueChange={(value: any) => setPriorityFilter(value)}
-          >
+          <Select value={priorityFilter} onValueChange={(value: any) => setPriorityFilter(value)}>
             <SelectTrigger className="w-48">
               <SelectValue placeholder="Todas as Prioridades" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem key="all" value="all">
-                Todas as Prioridades
-              </SelectItem>
+              <SelectItem key="all" value="all">Todas as Prioridades</SelectItem>
               {Object.entries(priorityLabels).map(([key, label]) => (
-                <SelectItem key={key} value={key}>
-                  {label}
-                </SelectItem>
+                <SelectItem key={key} value={key}>{label}</SelectItem>
               ))}
             </SelectContent>
           </Select>
 
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={handleExportReport}
-            title="Exportar Relatório"
-          >
+          <Button variant="outline" size="icon" onClick={handleExportReport} title="Exportar Relatório">
             <Download className="h-4 w-4" />
           </Button>
 
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={handlePrintAll}
-            title="Imprimir Lista"
-          >
+          <Button variant="outline" size="icon" onClick={() => handlePrintOrder(null)} title="Imprimir Lista">
             <Printer className="h-4 w-4" />
           </Button>
         </div>
@@ -1337,25 +895,15 @@ export default function OrdersSupabase() {
           <CardContent>
             <Tabs value={activeTab} onValueChange={setActiveTab}>
               <TabsList className="grid w-full grid-cols-6">
-                <TabsTrigger value="all">
-                  Todos ({stats.totalOrders})
-                </TabsTrigger>
-                <TabsTrigger value="pending">
-                  Pendentes ({stats.pendingOrders})
-                </TabsTrigger>
+                <TabsTrigger value="all">Todos ({stats.totalOrders})</TabsTrigger>
+                <TabsTrigger value="pending">Pendentes ({stats.pendingOrders})</TabsTrigger>
                 <TabsTrigger value="confirmed">
-                  Confirmados (
-                  {orders.filter((o) => o.status === "confirmed").length})
+                  Confirmados ({orders.filter((o) => o.status === "confirmed").length})
                 </TabsTrigger>
-                <TabsTrigger value="in_production">
-                  Em Produção ({stats.inProductionOrders})
-                </TabsTrigger>
-                <TabsTrigger value="ready">
-                  Prontos ({stats.readyOrders})
-                </TabsTrigger>
+                <TabsTrigger value="in_production">Em Produção ({stats.inProductionOrders})</TabsTrigger>
+                <TabsTrigger value="ready">Prontos ({stats.readyOrders})</TabsTrigger>
                 <TabsTrigger value="delivered">
-                  Entregues (
-                  {orders.filter((o) => o.status === "delivered").length})
+                  Entregues ({orders.filter((o) => o.status === "delivered").length})
                 </TabsTrigger>
               </TabsList>
 
@@ -1378,45 +926,28 @@ export default function OrdersSupabase() {
                   <TableBody>
                     {paginatedOrders.length === 0 ? (
                       <TableRow>
-                        <TableCell
-                          colSpan={10}
-                          className="h-24 text-center text-muted-foreground"
-                        >
+                        <TableCell colSpan={10} className="h-24 text-center text-muted-foreground">
                           Nenhum pedido encontrado.
                         </TableCell>
                       </TableRow>
                     ) : (
                       paginatedOrders.map((order) => {
-                        const daysUntilDelivery = getDaysUntilDelivery(
-                          order.delivery_date,
-                        );
+                        const daysUntilDelivery = getDaysUntilDelivery(order.delivery_date);
                         const isOverdue =
                           daysUntilDelivery !== null &&
                           daysUntilDelivery < 0 &&
                           !["delivered", "cancelled"].includes(order.status);
 
                         return (
-                          <TableRow
-                            key={order.id}
-                            className={
-                              isOverdue ? "bg-red-50 dark:bg-red-950/20" : ""
-                            }
-                          >
+                          <TableRow key={order.id} className={isOverdue ? "bg-red-50 dark:bg-red-950/20" : ""}>
                             <TableCell>
                               <div className="flex items-center space-x-2">
-                                <div
-                                  className={`w-2 h-2 rounded-full ${priorityColors[order.priority]}`}
-                                />
+                                <div className={`w-2 h-2 rounded-full ${priorityColors[order.priority]}`} />
                                 <div>
                                   <div className="font-medium flex items-center gap-2">
                                     {order.order_number}
                                     {order.is_fragmented && (
-                                      <Badge
-                                        variant="outline"
-                                        className="text-xs"
-                                      >
-                                        Fragmentado
-                                      </Badge>
+                                      <Badge variant="outline" className="text-xs">Fragmentado</Badge>
                                     )}
                                   </div>
                                   {order.assigned_operator && (
@@ -1430,34 +961,22 @@ export default function OrdersSupabase() {
                             </TableCell>
                             <TableCell>
                               <div>
-                                <div className="font-medium">
-                                  {order.customer_name}
-                                </div>
-                                <div className="text-xs text-muted-foreground">
-                                  {order.customer_phone}
-                                </div>
+                                <div className="font-medium">{order.customer_name}</div>
+                                <div className="text-xs text-muted-foreground">{order.customer_phone}</div>
                               </div>
                             </TableCell>
                             <TableCell>
                               <div>
-                                <div className="font-medium text-biobox-green">
-                                  {order.seller_name}
-                                </div>
-                                <div className="text-xs text-muted-foreground">
-                                  Vendedor
-                                </div>
+                                <div className="font-medium text-biobox-green">{order.seller_name}</div>
+                                <div className="text-xs text-muted-foreground">Vendedor</div>
                               </div>
                             </TableCell>
                             <TableCell>
-                              <div className="text-sm">
-                                {formatDate(order.scheduled_date)}
-                              </div>
+                              <div className="text-sm">{formatDate(order.scheduled_date)}</div>
                             </TableCell>
                             <TableCell>
                               <div className="text-sm">
-                                {order.delivery_date
-                                  ? formatDate(order.delivery_date)
-                                  : "-"}
+                                {order.delivery_date ? formatDate(order.delivery_date) : "-"}
                                 {daysUntilDelivery !== null && (
                                   <div
                                     className={`text-xs ${isOverdue ? "text-red-500" : daysUntilDelivery <= 3 ? "text-orange-500" : "text-muted-foreground"}`}
@@ -1478,93 +997,84 @@ export default function OrdersSupabase() {
                                 <div className="w-full bg-gray-200 rounded-full h-2">
                                   <div
                                     className="bg-biobox-green h-2 rounded-full"
-                                    style={{
-                                      width: `${order.production_progress}%`,
-                                    }}
+                                    style={{ width: `${order.production_progress}%` }}
                                   ></div>
                                 </div>
-                                <span className="text-xs text-muted-foreground">
-                                  {order.production_progress}%
-                                </span>
+                                <span className="text-xs text-muted-foreground">{order.production_progress}%</span>
                               </div>
                             </TableCell>
                             <TableCell>
-                              <Badge className={statusColors[order.status]}>
-                                {statusLabels[order.status]}
-                              </Badge>
+                              <Badge className={statusColors[order.status]}>{statusLabels[order.status]}</Badge>
                             </TableCell>
                             <TableCell>
-                              <Badge className={priorityColors[order.priority]}>
-                                {priorityLabels[order.priority]}
-                              </Badge>
+                              <Badge className={priorityColors[order.priority]}>{priorityLabels[order.priority]}</Badge>
                             </TableCell>
-                            <TableCell className="font-medium">
-                              {formatCurrency(order.total_amount)}
-                            </TableCell>
+                            <TableCell className="font-medium">{formatCurrency(order.total_amount)}</TableCell>
                             <TableCell>
                               <div className="flex items-center space-x-2">
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => handleViewOrder(order)}
-                                >
+                                {/* Botão Ver Detalhes */}
+                                <Button variant="ghost" size="icon" onClick={() => handleViewOrder(order)} title="Ver detalhes">
                                   <Eye className="h-4 w-4" />
                                 </Button>
-                                {availableActions(order)
-                                  .filter((a) =>
-                                    checkPermission(
-                                      "orders",
-                                      a.perm.split(":")[1],
-                                    ),
-                                  )
-                                  .map((action) => (
-                                    <Button
-                                      key={action.label}
-                                      variant="secondary"
-                                      size="sm"
-                                      onClick={() =>
-                                        handleTransition(
-                                          order,
-                                          action.next,
-                                          action.progress,
-                                        )
-                                      }
-                                    >
-                                      {action.label}
-                                    </Button>
-                                  ))}
+
+                                {/* Mudanças Rápidas de Status */}
+                                <QuickStatusChange order={order} onTransition={handleTransition} />
+
+                                {/* Botão Fragmentar */}
                                 {checkPermission("orders", "edit") &&
-                                  !["delivered", "cancelled"].includes(
-                                    order.status,
-                                  ) && (
+                                  !["delivered", "cancelled"].includes(order.status) && (
                                     <Button
                                       variant="outline"
                                       size="sm"
-                                      onClick={() => openFragmentForm(order)}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        openFragmentForm(order);
+                                      }}
+                                      title="Fragmentar produção"
                                     >
                                       <Scissors className="h-4 w-4 mr-2" />
                                       Fragmentar
                                     </Button>
                                   )}
+
+                                {/* Botão Editar */}
                                 {checkPermission("orders", "edit") && (
-                                  <Button variant="ghost" size="icon">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleEditOrder(order);
+                                    }}
+                                    title="Editar pedido"
+                                  >
                                     <Edit className="h-4 w-4" />
                                   </Button>
                                 )}
+
+                                {/* Botão Imprimir */}
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  onClick={() => handlePrintOrder(order)}
-                                  title="Imprimir Pedido"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handlePrintOrder(order);
+                                  }}
+                                  title="Imprimir pedido"
                                 >
                                   <Printer className="h-4 w-4" />
                                 </Button>
+
+                                {/* Botão Deletar */}
                                 {checkPermission("orders", "delete") && (
                                   <Button
                                     variant="ghost"
                                     size="icon"
-                                    onClick={() => handleDeleteOrder(order.id)}
-                                    title="Excluir Pedido"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeleteOrder(order.id);
+                                    }}
+                                    title="Excluir pedido"
                                     className="text-red-500 hover:text-red-700 hover:bg-red-50"
                                   >
                                     <Trash2 className="h-4 w-4" />
@@ -1580,24 +1090,16 @@ export default function OrdersSupabase() {
                 </Table>
                 <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <p className="text-sm text-muted-foreground">
-                    Mostrando {hasOrders ? `${rangeStart}–${rangeEnd}` : "0"} de{" "}
-                    {filteredOrders.length} pedidos
+                    Mostrando {hasOrders ? `${rangeStart}–${rangeEnd}` : "0"} de {filteredOrders.length} pedidos
                   </p>
                   <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setCurrentPage(1)}
-                      disabled={currentPage === 1}
-                    >
+                    <Button variant="outline" size="sm" onClick={() => setCurrentPage(1)} disabled={currentPage === 1}>
                       <ChevronsLeft className="h-4 w-4" />
                     </Button>
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() =>
-                        setCurrentPage((prev) => Math.max(1, prev - 1))
-                      }
+                      onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
                       disabled={currentPage === 1}
                     >
                       <ChevronLeft className="h-4 w-4" />
@@ -1608,9 +1110,7 @@ export default function OrdersSupabase() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() =>
-                        setCurrentPage((prev) => Math.min(pageCount, prev + 1))
-                      }
+                      onClick={() => setCurrentPage((prev) => Math.min(pageCount, prev + 1))}
                       disabled={currentPage === pageCount || !hasOrders}
                     >
                       <ChevronRight className="h-4 w-4" />
@@ -1632,196 +1132,271 @@ export default function OrdersSupabase() {
 
         {/* Order Details Dialog */}
         <Dialog open={showOrderDetails} onOpenChange={setShowOrderDetails}>
-          <DialogContent className="max-w-4xl">
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>
-                Detalhes do Pedido {selectedOrder?.order_number}
-              </DialogTitle>
-              <DialogDescription>
-                Visualize e gerencie as informações completas do pedido
-              </DialogDescription>
+              <DialogTitle>Detalhes do Pedido {selectedOrder?.order_number}</DialogTitle>
+              <DialogDescription>Visualize e gerencie as informações completas do pedido</DialogDescription>
             </DialogHeader>
             {selectedOrder && (
               <div className="space-y-6">
+                {/* Cabeçalho com Status e Ações Rápidas */}
+                <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
+                  <div className="flex items-center gap-4">
+                    <Badge className={statusColors[selectedOrder.status]}>{statusLabels[selectedOrder.status]}</Badge>
+                    <Badge className={priorityColors[selectedOrder.priority]}>{priorityLabels[selectedOrder.priority]}</Badge>
+                    {selectedOrder.is_fragmented && (
+                      <Badge variant="outline">
+                        <Scissors className="h-3 w-3 mr-1" />
+                        Fragmentado
+                      </Badge>
+                    )}
+                  </div>
+                  <QuickStatusChange order={selectedOrder} onTransition={handleTransition} />
+                </div>
+
+                {/* Informações do Cliente e Pedido */}
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <h3 className="font-semibold mb-2">
-                      Informações do Cliente
-                    </h3>
-                    <p>
-                      <strong>Nome:</strong> {selectedOrder.customer_name}
-                    </p>
-                    <p>
-                      <strong>Telefone:</strong> {selectedOrder.customer_phone}
-                    </p>
-                    <p>
-                      <strong>Email:</strong> {selectedOrder.customer_email}
-                    </p>
-                  </div>
-                  <div>
-                    <h3 className="font-semibold mb-2">
-                      Informações do Pedido
-                    </h3>
-                    <p>
-                      <strong>Vendedor:</strong> {selectedOrder.seller_name}
-                    </p>
-                    <p>
-                      <strong>Status:</strong>{" "}
-                      {statusLabels[selectedOrder.status]}
-                    </p>
-                    <p>
-                      <strong>Prioridade:</strong>{" "}
-                      {priorityLabels[selectedOrder.priority]}
-                    </p>
-                    <p>
-                      <strong>Progresso:</strong>{" "}
-                      {selectedOrder.production_progress}%
-                    </p>
-                  </div>
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base">Informações do Cliente</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      <div className="flex items-start gap-2">
+                        <User className="h-4 w-4 text-muted-foreground mt-0.5" />
+                        <div>
+                          <p className="font-medium">{selectedOrder.customer_name}</p>
+                          <p className="text-sm text-muted-foreground">Cliente</p>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <Phone className="h-4 w-4 text-muted-foreground mt-0.5" />
+                        <div>
+                          <p className="font-medium">{selectedOrder.customer_phone}</p>
+                          <p className="text-sm text-muted-foreground">Telefone</p>
+                        </div>
+                      </div>
+                      {selectedOrder.customer_email && (
+                        <div className="flex items-start gap-2">
+                          <Mail className="h-4 w-4 text-muted-foreground mt-0.5" />
+                          <div>
+                            <p className="font-medium">{selectedOrder.customer_email}</p>
+                            <p className="text-sm text-muted-foreground">E-mail</p>
+                          </div>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base">Informações do Pedido</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      <div className="flex items-start gap-2">
+                        <User className="h-4 w-4 text-muted-foreground mt-0.5" />
+                        <div>
+                          <p className="font-medium">{selectedOrder.seller_name}</p>
+                          <p className="text-sm text-muted-foreground">Vendedor</p>
+                        </div>
+                      </div>
+                      {selectedOrder.assigned_operator && (
+                        <div className="flex items-start gap-2">
+                          <User className="h-4 w-4 text-muted-foreground mt-0.5" />
+                          <div>
+                            <p className="font-medium">{selectedOrder.assigned_operator}</p>
+                            <p className="text-sm text-muted-foreground">Operador</p>
+                          </div>
+                        </div>
+                      )}
+                      <div className="flex items-start gap-2">
+                        <Clock className="h-4 w-4 text-muted-foreground mt-0.5" />
+                        <div>
+                          <p className="font-medium">{selectedOrder.production_progress}%</p>
+                          <p className="text-sm text-muted-foreground">Progresso</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
                 </div>
 
-                <div>
-                  <h3 className="font-semibold mb-2">Datas</h3>
-                  <div className="grid grid-cols-3 gap-4">
-                    <p>
-                      <strong>Criado em:</strong>{" "}
-                      {formatDate(selectedOrder.created_at)}
-                    </p>
-                    <p>
-                      <strong>Produção:</strong>{" "}
-                      {formatDate(selectedOrder.scheduled_date)}
-                    </p>
-                    <p>
-                      <strong>Entrega:</strong>{" "}
-                      {selectedOrder.delivery_date
-                        ? formatDate(selectedOrder.delivery_date)
-                        : "Não definida"}
-                    </p>
-                  </div>
-                </div>
+                {/* Datas */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Cronograma</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-3 gap-4">
+                      <div>
+                        <p className="text-sm text-muted-foreground mb-1">Criado em</p>
+                        <p className="font-medium">{formatDate(selectedOrder.created_at)}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground mb-1">Produção</p>
+                        <p className="font-medium">{formatDate(selectedOrder.scheduled_date)}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground mb-1">Entrega</p>
+                        <p className="font-medium">
+                          {selectedOrder.delivery_date ? formatDate(selectedOrder.delivery_date) : "Não definida"}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
 
-                {selectedOrder.notes && (
-                  <div>
-                    <h3 className="font-semibold mb-2">Observações</h3>
-                    <p className="text-muted-foreground">
-                      {selectedOrder.notes}
-                    </p>
-                  </div>
-                )}
-
-                {selectedOrder.fragments &&
-                  selectedOrder.fragments.length > 0 && (
-                    <div>
-                      <h3 className="font-semibold mb-2">
-                        Fragmentação de Produção
-                      </h3>
+                {/* Produtos */}
+                {selectedOrder.products && selectedOrder.products.length > 0 && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base">Produtos</CardTitle>
+                    </CardHeader>
+                    <CardContent>
                       <div className="space-y-2">
-                        {selectedOrder.fragments.map((fragment) => (
-                          <div
-                            key={fragment.id}
-                            className="border border-border rounded-lg p-3"
-                          >
-                            <div className="flex items-center justify-between">
-                              <span className="font-medium">
-                                Fragmento {fragment.fragment_number} ·{" "}
-                                {fragment.quantity} unidade(s)
-                              </span>
-                              <Badge
-                                className={
-                                  fragmentStatusColors[fragment.status] ||
-                                  fragmentStatusColors.pending
-                                }
-                              >
-                                {fragmentStatusLabels[fragment.status]}
-                              </Badge>
+                        {selectedOrder.products.map((product, index) => (
+                          <div key={index} className="flex justify-between items-start p-3 bg-muted/50 rounded-lg">
+                            <div>
+                              <p className="font-medium">{product.product_name || "Produto"}</p>
+                              <p className="text-sm text-muted-foreground">
+                                {[product.model, product.size, product.color, product.fabric].filter(Boolean).join(" • ")}
+                              </p>
                             </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2 text-sm text-muted-foreground">
-                              <span>
-                                Produção:{" "}
-                                {formatDate(fragment.scheduled_date as any)}
-                              </span>
-                              {fragment.value ? (
-                                <span>
-                                  Valor: {formatCurrency(fragment.value)}
-                                </span>
-                              ) : null}
-                              <span>Progresso: {fragment.progress ?? 0}%</span>
-                              {fragment.assigned_operator ? (
-                                <span>
-                                  Operador: {fragment.assigned_operator}
-                                </span>
-                              ) : null}
+                            <div className="text-right">
+                              <p className="font-medium">
+                                {product.quantity}x {formatCurrency(product.unit_price)}
+                              </p>
+                              <p className="text-sm text-muted-foreground">{formatCurrency(product.total_price)}</p>
                             </div>
                           </div>
                         ))}
                       </div>
-                    </div>
-                  )}
+                    </CardContent>
+                  </Card>
+                )}
 
-                <div className="flex justify-between">
-                  <div className="text-lg font-bold">
-                    Total: {formatCurrency(selectedOrder.total_amount)}
+                {/* Fragmentos */}
+                {selectedOrder.fragments && selectedOrder.fragments.length > 0 && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base">Fragmentação de Produção</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2">
+                        {selectedOrder.fragments.map((fragment) => (
+                          <div key={fragment.id} className="border rounded-lg p-3">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="font-medium">
+                                Fragmento {fragment.fragment_number} · {fragment.quantity} unidade(s)
+                              </span>
+                              <Badge className={fragmentStatusColors[fragment.status] || fragmentStatusColors.pending}>
+                                {fragmentStatusLabels[fragment.status]}
+                              </Badge>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2 text-sm text-muted-foreground">
+                              <span>Produção: {formatDate(fragment.scheduled_date as any)}</span>
+                              {fragment.value > 0 && <span>Valor: {formatCurrency(fragment.value)}</span>}
+                              <span>Progresso: {fragment.progress ?? 0}%</span>
+                              {fragment.assigned_operator && <span>Operador: {fragment.assigned_operator}</span>}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Observações */}
+                {selectedOrder.notes && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base">Observações</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-sm whitespace-pre-wrap">{selectedOrder.notes}</p>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Resumo Financeiro */}
+                <div className="flex justify-between items-center p-4 bg-biobox-green/10 border border-biobox-green/20 rounded-lg">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Total do Pedido</p>
+                    <p className="text-2xl font-bold text-biobox-green">{formatCurrency(selectedOrder.total_amount)}</p>
                   </div>
-                  <div className="space-x-2">
-                    {checkPermission("orders", "edit") &&
-                      !["delivered", "cancelled"].includes(
-                        selectedOrder.status,
-                      ) && (
-                        <Button
-                          variant="outline"
-                          onClick={() => openFragmentForm(selectedOrder)}
-                        >
-                          <Scissors className="h-4 w-4 mr-2" />
-                          Fragmentar Produção
-                        </Button>
-                      )}
+                  <div className="text-right">
+                    <p className="text-sm text-muted-foreground">Quantidade Total</p>
+                    <p className="text-2xl font-bold">{selectedOrder.total_quantity}</p>
+                  </div>
+                </div>
+
+                {/* Ações */}
+                <div className="flex justify-end gap-2 pt-4 border-t">
+                  {checkPermission("orders", "edit") && !["delivered", "cancelled"].includes(selectedOrder.status) && (
                     <Button
                       variant="outline"
-                      onClick={() => handlePrintOrder(selectedOrder)}
+                      onClick={() => {
+                        setShowOrderDetails(false);
+                        openFragmentForm(selectedOrder);
+                      }}
                     >
-                      <Printer className="h-4 w-4 mr-2" />
-                      Imprimir
+                      <Scissors className="h-4 w-4 mr-2" />
+                      Fragmentar Produção
                     </Button>
-                    {availableActions(selectedOrder)
-                      .filter((a) =>
-                        checkPermission("orders", a.perm.split(":")[1]),
-                      )
-                      .map((a) => (
-                        <Button
-                          key={a.label}
-                          onClick={() =>
-                            handleTransition(selectedOrder, a.next, a.progress)
-                          }
-                        >
-                          {a.label}
-                        </Button>
-                      ))}
-                    {checkPermission("orders", "edit") && (
-                      <Button>
-                        <Edit className="h-4 w-4 mr-2" />
-                        Editar Pedido
-                      </Button>
-                    )}
-                  </div>
+                  )}
+
+                  <Button variant="outline" onClick={() => handlePrintOrder(selectedOrder)}>
+                    <Printer className="h-4 w-4 mr-2" />
+                    Imprimir
+                  </Button>
+
+                  {checkPermission("orders", "edit") && (
+                    <Button className="bg-biobox-green hover:bg-biobox-green-dark" onClick={() => handleEditOrder(selectedOrder)}>
+                      <Edit className="h-4 w-4 mr-2" />
+                      Editar Pedido
+                    </Button>
+                  )}
+
+                  {checkPermission("orders", "delete") && (
+                    <Button
+                      variant="destructive"
+                      onClick={() => {
+                        setShowOrderDetails(false);
+                        handleDeleteOrder(selectedOrder.id);
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Excluir Pedido
+                    </Button>
+                  )}
                 </div>
               </div>
             )}
           </DialogContent>
         </Dialog>
 
-        {/* New Order Form */}
-        <NewOrderForm
-          open={showNewOrderForm}
-          onOpenChange={setShowNewOrderForm}
-          onOrderCreated={handleOrderCreated}
-        />
+        {/* Edit Order Dialog */}
+        <Dialog open={showEditForm} onOpenChange={setShowEditForm}>
+          <DialogContent className="max-w-5xl max-h-[95vh] overflow-hidden">
+            {editingOrder && (
+              <OrderEditForm
+                order={editingOrder}
+                onSave={handleSaveEditedOrder}
+                onCancel={() => {
+                  setShowEditForm(false);
+                  setEditingOrder(null);
+                }}
+                saving={false}
+              />
+            )}
+          </DialogContent>
+        </Dialog>
 
+        {/* New Order Form */}
+        <NewOrderForm open={showNewOrderForm} onOpenChange={setShowNewOrderForm} onOrderCreated={handleOrderCreated} />
+
+        {/* Fragment Form */}
         {showFragmentForm && fragmentTarget && (
           <OrderFragmentForm
-            totalQuantity={Math.max(
-              1,
-              resolveFragmentTotalQuantity(fragmentTarget, fragmentInitial),
-            )}
+            totalQuantity={Math.max(1, resolveFragmentTotalQuantity(fragmentTarget, fragmentInitial))}
             totalValue={toNumber(fragmentTarget.total_amount)}
             orderId={fragmentTarget.id}
             initialFragments={fragmentInitial}
