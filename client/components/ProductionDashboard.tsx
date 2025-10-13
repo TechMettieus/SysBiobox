@@ -414,6 +414,24 @@ export default function ProductionDashboard({ tasks }: ProductionDashboardProps)
     );
   };
 
+  if (loading && mergedTasks.length === 0) {
+    return (
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {Array.from({ length: 6 }).map((_, index) => (
+          <Card key={index} className="border-border bg-card">
+            <CardContent className="p-6">
+              <div className="space-y-3">
+                <div className="h-4 w-24 animate-pulse rounded bg-muted" />
+                <div className="h-8 w-32 animate-pulse rounded bg-muted" />
+                <div className="h-3 w-28 animate-pulse rounded bg-muted" />
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="grid gap-4 md:grid-cols-4">
