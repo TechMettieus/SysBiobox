@@ -310,7 +310,7 @@ export default function ProductionDashboard({
     };
 
     fetchOrders();
-  }, [getOrders]);
+  }, []);
 
   const mapStoredTaskToProductionTask = useCallback(
     (task: StoredTask): ProductionTask => {
