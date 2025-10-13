@@ -292,6 +292,82 @@ export default function ProductionDashboard({ tasks, refreshToken }: ProductionD
     fetchOrders();
   }, [getOrders]);
 
+  const mapStoredTaskToProductionTask = useCallback(
+    (task: StoredTask): ProductionTask => {
+      const relatedOrder = orders.find((order) => order.id === task.order_id);
+      const normalizedOrderStatus = relatedOrder ? normalizeStatus(relatedOrder.status) : "pending";
+      const stageId = orderStatusToProductionStage(normalizedOrderStatus);
+      const stage = productionStages.find((item) => item.id === stageId);
+
+      const baseStatus = normalizeTaskStatusValue(task.status);
+      const priority = normalizeTaskPriority(task.priority);
+      const startTime =
+        parseDate(task.created_at) || (relatedOrder ? parseDate(relatedOrder.updated_at) : undefined);
+      const estimatedHours = toNumber(task.estimated_hours);
+      const estimatedCompletionTime =
+        estimatedHours > 0 && startTime
+          ? new Date(startTime.getTime() + estimatedHours * 60 * 60 * 1000)
+          : relatedOrder
+            ? parseDate(relatedOrder.delivery_date)
+            : undefined;
+
+      const actualCompletionTime =
+        baseStatus === "completed"
+          ? parseDate(task.updated_at) || (relatedOrder ? parseDate(relatedOrder.completed_date) : undefined)
+          : relatedOrder
+            ? parseDate(relatedOrder.completed_date)
+            : undefined;
+
+      const productName =
+        relatedOrder?.products?.[0]?.product_name ||
+        (relatedOrder?.products?.[0] as any)?.productName ||
+        task.task_name ||
+        "Tarefa de produção";
+
+      const progress =
+        relatedOrder != null
+          ? computeProgress(relatedOrder)
+          : baseStatus === "completed"
+            ? 100
+            : baseStatus === "in_progress"
+              ? 50
+              : 0;
+
+      return {
+        id: task.id,
+        orderId: task.order_id,
+        orderNumber: relatedOrder?.order_number ?? task.order_id,
+        productName,
+        customerId: relatedOrder?.customer_id ?? task.order_id,
+        customerName: relatedOrder?.customer_name ?? "Cliente",
+        stage: stage?.id || "design",
+        stageOrder: stage?.order ?? 1,
+        status: baseStatus,
+        priority,
+        assignedOperator: task.assigned_operator ?? undefined,
+        startTime,
+        estimatedCompletionTime,
+        actualCompletionTime,
+        progress,
+        notes: task.notes ?? undefined,
+      };
+    },
+    [orders],
+  );
+
+  const localProductionTasks = useMemo(() => {
+    if (storedTasks.length === 0) {
+      return [];
+    }
+
+    const mapped = storedTasks.map(mapStoredTaskToProductionTask);
+    const dedup = new Map<string, ProductionTask>();
+    mapped.forEach((task) => {
+      dedup.set(task.id, task);
+    });
+    return Array.from(dedup.values());
+  }, [storedTasks, mapStoredTaskToProductionTask]);
+
   const mergedTasks = useMemo(() => {
     const baseTasks = tasks || [];
     const orderTasks = orders
