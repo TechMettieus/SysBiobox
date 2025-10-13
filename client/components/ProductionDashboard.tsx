@@ -46,6 +46,41 @@ const PRODUCTION_STATUSES: Order["status"][] = [
   "ready",
 ];
 
+const TASK_STATUSES: ProductionTask["status"][] = [
+  "pending",
+  "in_progress",
+  "completed",
+  "paused",
+  "blocked",
+];
+
+const TASK_PRIORITIES: ProductionTask["priority"][] = [
+  "low",
+  "medium",
+  "high",
+  "urgent",
+];
+
+const normalizeTaskStatusValue = (value: unknown): ProductionTask["status"] => {
+  if (typeof value === "string") {
+    const candidate = value.toLowerCase() as ProductionTask["status"];
+    if (TASK_STATUSES.includes(candidate)) {
+      return candidate;
+    }
+  }
+  return "pending";
+};
+
+const normalizeTaskPriority = (value: unknown): ProductionTask["priority"] => {
+  if (typeof value === "string") {
+    const candidate = value.toLowerCase() as ProductionTask["priority"];
+    if (TASK_PRIORITIES.includes(candidate)) {
+      return candidate;
+    }
+  }
+  return "medium";
+};
+
 const normalizeStatus = (value: unknown): Order["status"] => {
   if (typeof value === "string") {
     const candidate = value.toLowerCase() as Order["status"];
