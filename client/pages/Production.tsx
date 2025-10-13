@@ -62,7 +62,10 @@ export default function Production() {
 
         <Dialog open={showNewTask} onOpenChange={setShowNewTask}>
           <DialogContent className="max-w-2xl">
-            <NewProductionTask onClose={() => setShowNewTask(false)} />
+            <NewProductionTask
+              onClose={() => setShowNewTask(false)}
+              onSaved={() => setRefreshToken((value) => value + 1)}
+            />
           </DialogContent>
         </Dialog>
       </div>
