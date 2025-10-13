@@ -217,7 +217,7 @@ const enrichTask = (task: ProductionTask): EnrichedTask => {
   };
 };
 
-export default function ProductionDashboard({ tasks }: ProductionDashboardProps) {
+export default function ProductionDashboard({ tasks, refreshToken }: ProductionDashboardProps) {
   const { getOrders } = useSupabase();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
