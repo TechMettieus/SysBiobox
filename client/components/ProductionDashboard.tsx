@@ -4,7 +4,13 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Clock, AlertTriangle, Package, TrendingUp, CheckCircle } from "lucide-react";
+import {
+  Clock,
+  AlertTriangle,
+  Package,
+  TrendingUp,
+  CheckCircle,
+} from "lucide-react";
 import {
   ProductionTask,
   productionStages,
@@ -85,7 +91,13 @@ const normalizeTaskPriority = (value: unknown): ProductionTask["priority"] => {
 const normalizeStatus = (value: unknown): Order["status"] => {
   if (typeof value === "string") {
     const candidate = value.toLowerCase() as Order["status"];
-    if (PRODUCTION_STATUSES.concat(["pending", "delivered", "cancelled"]).includes(candidate)) {
+    if (
+      PRODUCTION_STATUSES.concat([
+        "pending",
+        "delivered",
+        "cancelled",
+      ]).includes(candidate)
+    ) {
       return candidate;
     }
   }
@@ -127,7 +139,9 @@ const parseDate = (value: unknown): Date | undefined => {
   return Number.isNaN(parsed.getTime()) ? undefined : parsed;
 };
 
-const orderStatusToTaskStage = (status: Order["status"]): ProductionTask["status"] => {
+const orderStatusToTaskStage = (
+  status: Order["status"],
+): ProductionTask["status"] => {
   switch (status) {
     case "confirmed":
       return "pending";
@@ -190,7 +204,9 @@ const mapOrderToTask = (order: Order): ProductionTask => {
     orderId: order.id,
     orderNumber: order.order_number,
     productName:
-      order.products?.[0]?.product_name || order.products?.[0]?.productName || "Pedido",
+      order.products?.[0]?.product_name ||
+      order.products?.[0]?.productName ||
+      "Pedido",
     customerId: order.customer_id,
     customerName: order.customer_name || "Cliente",
     stage: stage?.id || "design",
@@ -198,7 +214,8 @@ const mapOrderToTask = (order: Order): ProductionTask => {
     status: orderStatusToTaskStage(status),
     priority: (order.priority || "medium") as ProductionTask["priority"],
     assignedOperator: order.assigned_operator || undefined,
-    startTime: parseDate((order as any).started_at) || parseDate(order.updated_at),
+    startTime:
+      parseDate((order as any).started_at) || parseDate(order.updated_at),
     estimatedCompletionTime: parseDate(order.delivery_date),
     actualCompletionTime: parseDate(order.completed_date),
     progress: computeProgress(order),
@@ -217,7 +234,10 @@ const enrichTask = (task: ProductionTask): EnrichedTask => {
   };
 };
 
-export default function ProductionDashboard({ tasks, refreshToken }: ProductionDashboardProps) {
+export default function ProductionDashboard({
+  tasks,
+  refreshToken,
+}: ProductionDashboardProps) {
   const { getOrders } = useSupabase();
   const [orders, setOrders] = useState<Order[]>([]);
   const [storedTasks, setStoredTasks] = useState<StoredTask[]>([]);
@@ -295,14 +315,17 @@ export default function ProductionDashboard({ tasks, refreshToken }: ProductionD
   const mapStoredTaskToProductionTask = useCallback(
     (task: StoredTask): ProductionTask => {
       const relatedOrder = orders.find((order) => order.id === task.order_id);
-      const normalizedOrderStatus = relatedOrder ? normalizeStatus(relatedOrder.status) : "pending";
+      const normalizedOrderStatus = relatedOrder
+        ? normalizeStatus(relatedOrder.status)
+        : "pending";
       const stageId = orderStatusToProductionStage(normalizedOrderStatus);
       const stage = productionStages.find((item) => item.id === stageId);
 
       const baseStatus = normalizeTaskStatusValue(task.status);
       const priority = normalizeTaskPriority(task.priority);
       const startTime =
-        parseDate(task.created_at) || (relatedOrder ? parseDate(relatedOrder.updated_at) : undefined);
+        parseDate(task.created_at) ||
+        (relatedOrder ? parseDate(relatedOrder.updated_at) : undefined);
       const estimatedHours = toNumber(task.estimated_hours);
       const estimatedCompletionTime =
         estimatedHours > 0 && startTime
@@ -313,7 +336,8 @@ export default function ProductionDashboard({ tasks, refreshToken }: ProductionD
 
       const actualCompletionTime =
         baseStatus === "completed"
-          ? parseDate(task.updated_at) || (relatedOrder ? parseDate(relatedOrder.completed_date) : undefined)
+          ? parseDate(task.updated_at) ||
+            (relatedOrder ? parseDate(relatedOrder.completed_date) : undefined)
           : relatedOrder
             ? parseDate(relatedOrder.completed_date)
             : undefined;
@@ -382,7 +406,9 @@ export default function ProductionDashboard({ tasks, refreshToken }: ProductionD
     const baseTasks = Array.from(baseMap.values());
 
     const orderTasks = orders
-      .filter((order) => PRODUCTION_STATUSES.includes(normalizeStatus(order.status)))
+      .filter((order) =>
+        PRODUCTION_STATUSES.includes(normalizeStatus(order.status)),
+      )
       .map(mapOrderToTask);
 
     const existingOrderIds = new Set(
@@ -393,7 +419,9 @@ export default function ProductionDashboard({ tasks, refreshToken }: ProductionD
 
     const combined = [
       ...baseTasks,
-      ...orderTasks.filter((task) => task.orderId && !existingOrderIds.has(task.orderId)),
+      ...orderTasks.filter(
+        (task) => task.orderId && !existingOrderIds.has(task.orderId),
+      ),
     ];
 
     const dedupById = new Map<string, ProductionTask>();
@@ -422,17 +450,26 @@ export default function ProductionDashboard({ tasks, refreshToken }: ProductionD
   }, [mergedTasks]);
 
   const taskStats = useMemo(() => {
-    const active = mergedTasks.filter((task) => task.status === "in_progress").length;
-    const pending = mergedTasks.filter((task) => task.status === "pending").length;
-    const completed = mergedTasks.filter((task) => task.status === "completed").length;
+    const active = mergedTasks.filter(
+      (task) => task.status === "in_progress",
+    ).length;
+    const pending = mergedTasks.filter(
+      (task) => task.status === "pending",
+    ).length;
+    const completed = mergedTasks.filter(
+      (task) => task.status === "completed",
+    ).length;
     const delayed = mergedTasks.filter(
       (task) =>
-        typeof task.dueInMinutes === "number" && task.dueInMinutes < 0 && task.status !== "completed",
+        typeof task.dueInMinutes === "number" &&
+        task.dueInMinutes < 0 &&
+        task.status !== "completed",
     ).length;
 
     const averageProgress = mergedTasks.length
       ? Math.round(
-          mergedTasks.reduce((sum, task) => sum + task.progress, 0) / mergedTasks.length,
+          mergedTasks.reduce((sum, task) => sum + task.progress, 0) /
+            mergedTasks.length,
         )
       : 0;
 
@@ -462,10 +499,18 @@ export default function ProductionDashboard({ tasks, refreshToken }: ProductionD
         <CardContent className="space-y-3 p-4">
           <div className="flex items-start justify-between">
             <div className="flex items-center space-x-2">
-              <div className={cn("h-2 w-2 rounded-full", priorityColors[task.priority])} />
+              <div
+                className={cn(
+                  "h-2 w-2 rounded-full",
+                  priorityColors[task.priority],
+                )}
+              />
               <span className="text-sm font-medium">{task.orderNumber}</span>
             </div>
-            <Badge variant="outline" className={cn("text-xs", statusColors[task.status])}>
+            <Badge
+              variant="outline"
+              className={cn("text-xs", statusColors[task.status])}
+            >
               {statusLabels[task.status]}
             </Badge>
           </div>
@@ -503,16 +548,17 @@ export default function ProductionDashboard({ tasks, refreshToken }: ProductionD
             <Progress value={task.progress} className="h-2" />
           </div>
 
-          {typeof task.dueInMinutes === "number" && task.status === "in_progress" && (
-            <div className="flex items-center text-xs text-muted-foreground">
-              <Clock className="mr-1 h-3 w-3" />
-              <span>
-                {task.dueInMinutes > 0
-                  ? `${task.dueInMinutes} min restantes`
-                  : "Atrasado"}
-              </span>
-            </div>
-          )}
+          {typeof task.dueInMinutes === "number" &&
+            task.status === "in_progress" && (
+              <div className="flex items-center text-xs text-muted-foreground">
+                <Clock className="mr-1 h-3 w-3" />
+                <span>
+                  {task.dueInMinutes > 0
+                    ? `${task.dueInMinutes} min restantes`
+                    : "Atrasado"}
+                </span>
+              </div>
+            )}
 
           {hasIssues && (
             <div className="flex items-center text-xs text-red-500">
@@ -536,12 +582,20 @@ export default function ProductionDashboard({ tasks, refreshToken }: ProductionD
       );
     }
 
-    const stage = productionStages.find((item) => item.id === selectedTask.stage);
+    const stage = productionStages.find(
+      (item) => item.id === selectedTask.stage,
+    );
     const startedAt = selectedTask.startTime
-      ? format(selectedTask.startTime, "dd 'de' MMMM yyyy, HH:mm", { locale: ptBR })
+      ? format(selectedTask.startTime, "dd 'de' MMMM yyyy, HH:mm", {
+          locale: ptBR,
+        })
       : "Não iniciado";
     const dueAt = selectedTask.estimatedCompletionTime
-      ? format(selectedTask.estimatedCompletionTime, "dd 'de' MMMM yyyy, HH:mm", { locale: ptBR })
+      ? format(
+          selectedTask.estimatedCompletionTime,
+          "dd 'de' MMMM yyyy, HH:mm",
+          { locale: ptBR },
+        )
       : "Não definido";
 
     return (
@@ -549,7 +603,10 @@ export default function ProductionDashboard({ tasks, refreshToken }: ProductionD
         <CardHeader>
           <CardTitle className="flex items-center justify-between text-lg">
             <span>{selectedTask.orderNumber}</span>
-            <Badge variant="outline" className={cn("text-xs", statusColors[selectedTask.status])}>
+            <Badge
+              variant="outline"
+              className={cn("text-xs", statusColors[selectedTask.status])}
+            >
               {statusLabels[selectedTask.status]}
             </Badge>
           </CardTitle>
@@ -566,18 +623,23 @@ export default function ProductionDashboard({ tasks, refreshToken }: ProductionD
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Etapa</p>
-              <p className="text-sm font-medium">{stage?.name ?? "Etapa de produção"}</p>
+              <p className="text-sm font-medium">
+                {stage?.name ?? "Etapa de produção"}
+              </p>
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Prioridade</p>
-              <Badge variant="outline" className={cn("text-xs", priorityColors[selectedTask.priority])}>
+              <Badge
+                variant="outline"
+                className={cn("text-xs", priorityColors[selectedTask.priority])}
+              >
                 {selectedTask.priority === "low"
                   ? "Baixa"
                   : selectedTask.priority === "medium"
-                  ? "Média"
-                  : selectedTask.priority === "high"
-                  ? "Alta"
-                  : "Urgente"}
+                    ? "Média"
+                    : selectedTask.priority === "high"
+                      ? "Alta"
+                      : "Urgente"}
               </Badge>
             </div>
           </div>
@@ -588,7 +650,9 @@ export default function ProductionDashboard({ tasks, refreshToken }: ProductionD
               <p className="text-sm font-medium">{startedAt}</p>
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">Previsão de término</p>
+              <p className="text-xs text-muted-foreground">
+                Previsão de término
+              </p>
               <p className="text-sm font-medium">{dueAt}</p>
             </div>
           </div>
@@ -604,7 +668,9 @@ export default function ProductionDashboard({ tasks, refreshToken }: ProductionD
           {selectedTask.notes && (
             <div>
               <p className="text-xs text-muted-foreground">Observações</p>
-              <p className="text-sm text-muted-foreground">{selectedTask.notes}</p>
+              <p className="text-sm text-muted-foreground">
+                {selectedTask.notes}
+              </p>
             </div>
           )}
 
@@ -616,7 +682,10 @@ export default function ProductionDashboard({ tasks, refreshToken }: ProductionD
               </div>
               <ul className="space-y-2 text-xs text-red-500">
                 {selectedTask.issues.map((issue) => (
-                  <li key={issue.id} className="rounded border border-red-500/20 p-2">
+                  <li
+                    key={issue.id}
+                    className="rounded border border-red-500/20 p-2"
+                  >
                     <p className="font-medium">{issue.type.toUpperCase()}</p>
                     <p>{issue.description}</p>
                   </li>
@@ -655,8 +724,12 @@ export default function ProductionDashboard({ tasks, refreshToken }: ProductionD
             <div className="flex items-center">
               <TrendingUp className="h-8 w-8 text-green-500" />
               <div className="ml-4">
-                <p className="text-sm font-medium text-muted-foreground">Tarefas em andamento</p>
-                <p className="text-2xl font-bold text-foreground">{taskStats.active}</p>
+                <p className="text-sm font-medium text-muted-foreground">
+                  Tarefas em andamento
+                </p>
+                <p className="text-2xl font-bold text-foreground">
+                  {taskStats.active}
+                </p>
               </div>
             </div>
           </CardContent>
@@ -666,8 +739,12 @@ export default function ProductionDashboard({ tasks, refreshToken }: ProductionD
             <div className="flex items-center">
               <Clock className="h-8 w-8 text-orange-500" />
               <div className="ml-4">
-                <p className="text-sm font-medium text-muted-foreground">Tarefas pendentes</p>
-                <p className="text-2xl font-bold text-foreground">{taskStats.pending}</p>
+                <p className="text-sm font-medium text-muted-foreground">
+                  Tarefas pendentes
+                </p>
+                <p className="text-2xl font-bold text-foreground">
+                  {taskStats.pending}
+                </p>
               </div>
             </div>
           </CardContent>
@@ -677,8 +754,12 @@ export default function ProductionDashboard({ tasks, refreshToken }: ProductionD
             <div className="flex items-center">
               <CheckCircle className="h-8 w-8 text-biobox-green" />
               <div className="ml-4">
-                <p className="text-sm font-medium text-muted-foreground">Concluídas</p>
-                <p className="text-2xl font-bold text-foreground">{taskStats.completed}</p>
+                <p className="text-sm font-medium text-muted-foreground">
+                  Concluídas
+                </p>
+                <p className="text-2xl font-bold text-foreground">
+                  {taskStats.completed}
+                </p>
               </div>
             </div>
           </CardContent>
@@ -688,8 +769,12 @@ export default function ProductionDashboard({ tasks, refreshToken }: ProductionD
             <div className="flex items-center">
               <AlertTriangle className="h-8 w-8 text-red-500" />
               <div className="ml-4">
-                <p className="text-sm font-medium text-muted-foreground">Atrasadas</p>
-                <p className="text-2xl font-bold text-foreground">{taskStats.delayed}</p>
+                <p className="text-sm font-medium text-muted-foreground">
+                  Atrasadas
+                </p>
+                <p className="text-2xl font-bold text-foreground">
+                  {taskStats.delayed}
+                </p>
               </div>
             </div>
           </CardContent>
@@ -714,7 +799,8 @@ export default function ProductionDashboard({ tasks, refreshToken }: ProductionD
             </TabsList>
 
             <TabsContent value="active">
-              {mergedTasks.filter((task) => task.status === "in_progress").length === 0 ? (
+              {mergedTasks.filter((task) => task.status === "in_progress")
+                .length === 0 ? (
                 <div className="rounded border border-dashed border-border p-10 text-center text-sm text-muted-foreground">
                   Nenhuma tarefa em progresso.
                 </div>
@@ -728,7 +814,8 @@ export default function ProductionDashboard({ tasks, refreshToken }: ProductionD
             </TabsContent>
 
             <TabsContent value="pending">
-              {mergedTasks.filter((task) => task.status === "pending").length === 0 ? (
+              {mergedTasks.filter((task) => task.status === "pending")
+                .length === 0 ? (
                 <div className="rounded border border-dashed border-border p-10 text-center text-sm text-muted-foreground">
                   Nenhuma tarefa pendente.
                 </div>
@@ -742,7 +829,8 @@ export default function ProductionDashboard({ tasks, refreshToken }: ProductionD
             </TabsContent>
 
             <TabsContent value="completed">
-              {mergedTasks.filter((task) => task.status === "completed").length === 0 ? (
+              {mergedTasks.filter((task) => task.status === "completed")
+                .length === 0 ? (
                 <div className="rounded border border-dashed border-border p-10 text-center text-sm text-muted-foreground">
                   Nenhuma tarefa concluída.
                 </div>
