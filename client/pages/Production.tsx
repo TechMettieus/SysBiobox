@@ -46,7 +46,7 @@ export default function Production() {
           </div>
         </div>
 
-        <ProductionDashboard />
+        <ProductionDashboard refreshToken={refreshToken} />
 
         <Dialog open={showReport} onOpenChange={setShowReport}>
           <DialogContent className="max-w-5xl">
