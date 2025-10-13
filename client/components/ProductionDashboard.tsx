@@ -26,6 +26,19 @@ interface EnrichedTask extends ProductionTask {
   dueInMinutes?: number;
 }
 
+type StoredTask = {
+  id: string;
+  order_id: string;
+  task_name?: string;
+  priority?: string;
+  assigned_operator?: string | null;
+  estimated_hours?: number | string | null;
+  notes?: string | null;
+  status?: string;
+  created_at?: string;
+  updated_at?: string;
+};
+
 const PRODUCTION_STATUSES: Order["status"][] = [
   "confirmed",
   "in_production",
