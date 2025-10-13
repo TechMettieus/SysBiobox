@@ -406,6 +406,21 @@ export default function ProductionDashboard({ tasks, refreshToken }: ProductionD
       .map(enrichTask);
   }, [tasks, orders, localProductionTasks]);
 
+  useEffect(() => {
+    if (mergedTasks.length === 0) {
+      setSelectedTask(null);
+      return;
+    }
+
+    setSelectedTask((current) => {
+      if (!current) {
+        return mergedTasks[0];
+      }
+      const updated = mergedTasks.find((task) => task.id === current.id);
+      return updated ?? mergedTasks[0];
+    });
+  }, [mergedTasks]);
+
   const taskStats = useMemo(() => {
     const active = mergedTasks.filter((task) => task.status === "in_progress").length;
     const pending = mergedTasks.filter((task) => task.status === "pending").length;
