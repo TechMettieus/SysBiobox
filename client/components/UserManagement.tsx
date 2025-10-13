@@ -3,19 +3,56 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Users, Plus, Edit, Trash2, Shield, User as UserIcon, Save, X, Eye, EyeOff, Loader2 } from "lucide-react";
+import {
+  Users,
+  Plus,
+  Edit,
+  Trash2,
+  Shield,
+  User as UserIcon,
+  Save,
+  X,
+  Eye,
+  EyeOff,
+  Loader2,
+} from "lucide-react";
 import { User as UserType, mockUsers, defaultPermissions } from "@/types/user";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useSupabase } from "@/hooks/useSupabase";
 import { db, isFirebaseConfigured, auth, app } from "@/lib/firebase";
-import { addDoc, collection, serverTimestamp, updateDoc, doc, setDoc } from "firebase/firestore";
-import { createUserWithEmailAndPassword, getAuth, signOut, updateProfile } from "firebase/auth";
+import {
+  addDoc,
+  collection,
+  serverTimestamp,
+  updateDoc,
+  doc,
+  setDoc,
+} from "firebase/firestore";
+import {
+  createUserWithEmailAndPassword,
+  getAuth,
+  signOut,
+  updateProfile,
+} from "firebase/auth";
 import { sanitizeForFirestore } from "@/lib/firestore";
 import { useToast } from "@/components/ui/use-toast";
 
@@ -48,7 +85,10 @@ export default function UserManagement() {
         status: "active",
         permissions: (u.permissions || []).map((permId) => {
           const perm = defaultPermissions.find((p) => p.id === permId);
-          return perm || ({ id: permId, name: permId, module: "system", actions: [] } as any);
+          return (
+            perm ||
+            ({ id: permId, name: permId, module: "system", actions: [] } as any)
+          );
         }),
         createdAt: new Date(u.created_at),
         updatedAt: new Date(u.updated_at),
@@ -164,8 +204,11 @@ export default function UserManagement() {
 
         if (isFirebaseConfigured && db) {
           try {
-            await updateDoc(doc(db, "users", selectedUser.id), sanitizeForFirestore(updatedData));
-            
+            await updateDoc(
+              doc(db, "users", selectedUser.id),
+              sanitizeForFirestore(updatedData),
+            );
+
             toast({
               title: "Usuário atualizado",
               description: `${formData.name} foi atualizado com sucesso`,
@@ -174,7 +217,8 @@ export default function UserManagement() {
             console.error("Erro ao atualizar no Firebase:", error);
             toast({
               title: "Erro ao atualizar",
-              description: error.message || "Não foi possível atualizar o usuário",
+              description:
+                error.message || "Não foi possível atualizar o usuário",
               variant: "destructive",
             });
             return;
@@ -197,7 +241,6 @@ export default function UserManagement() {
               : u,
           ),
         );
-
       } else {
         // **CRIAR NOVO USUÁRIO**
         let userId: string;
@@ -207,19 +250,24 @@ export default function UserManagement() {
         if (isFirebaseConfigured) {
           try {
             const { initializeApp, deleteApp } = await import("firebase/app");
-            const secondary = initializeApp((app as any).options, `auth-create-${Date.now()}`);
+            const secondary = initializeApp(
+              (app as any).options,
+              `auth-create-${Date.now()}`,
+            );
             const secondaryAuth = getAuth(secondary);
 
             const userCredential = await createUserWithEmailAndPassword(
               secondaryAuth,
               formData.email.trim().toLowerCase(),
-              formData.password
+              formData.password,
             );
             userId = userCredential.user.uid;
             createdInAuth = true;
 
             try {
-              await updateProfile(userCredential.user, { displayName: formData.name.trim() });
+              await updateProfile(userCredential.user, {
+                displayName: formData.name.trim(),
+              });
             } catch {}
 
             await signOut(secondaryAuth);
@@ -232,7 +280,7 @@ export default function UserManagement() {
           } catch (error: any) {
             console.error("Erro no Firebase Auth:", error);
 
-            if (error.code === 'auth/email-already-in-use') {
+            if (error.code === "auth/email-already-in-use") {
               toast({
                 title: "Email já cadastrado",
                 description: "Este email já está sendo usado por outro usuário",
@@ -270,7 +318,7 @@ export default function UserManagement() {
               sanitizeForFirestore({
                 ...newUserData,
                 uid: userId,
-              })
+              }),
             );
           } catch (error: any) {
             console.error("Erro ao salvar no Firestore:", error);
@@ -298,16 +346,15 @@ export default function UserManagement() {
 
         toast({
           title: "Usuário criado",
-          description: `${formData.name} foi adicionado ao sistema${createdInAuth ? ' com autenticação' : ''}`,
+          description: `${formData.name} foi adicionado ao sistema${createdInAuth ? " com autenticação" : ""}`,
         });
       }
 
       setShowForm(false);
       setSelectedUser(undefined);
-      
+
       // Recarregar usuários para garantir sincronia
       await loadUsers();
-
     } catch (error: any) {
       console.error("Erro ao salvar usuário:", error);
       toast({
@@ -330,15 +377,19 @@ export default function UserManagement() {
       return;
     }
 
-    const userToDelete = users.find(u => u.id === userId);
+    const userToDelete = users.find((u) => u.id === userId);
     if (!userToDelete) return;
 
-    if (!confirm(`Tem certeza que deseja excluir ${userToDelete.name}?\n\nEsta ação não pode ser desfeita.`)) {
+    if (
+      !confirm(
+        `Tem certeza que deseja excluir ${userToDelete.name}?\n\nEsta ação não pode ser desfeita.`,
+      )
+    ) {
       return;
     }
 
     setUsers((prev) => prev.filter((u) => u.id !== userId));
-    
+
     toast({
       title: "Usuário excluído",
       description: `${userToDelete.name} foi removido do sistema`,
@@ -356,7 +407,7 @@ export default function UserManagement() {
 
   const handleSavePermissions = async () => {
     if (!permissionUser) return;
-    
+
     try {
       const userPermissions = defaultPermissions.filter((p) =>
         formData.permissions.includes(p.id),
@@ -368,7 +419,7 @@ export default function UserManagement() {
           sanitizeForFirestore({
             permissions: userPermissions.map((p) => p.id),
             updated_at: serverTimestamp(),
-          })
+          }),
         );
       }
 
@@ -379,10 +430,10 @@ export default function UserManagement() {
             : u,
         ),
       );
-      
+
       setShowPermissions(false);
       setPermissionUser(undefined);
-      
+
       toast({
         title: "Permissões atualizadas",
         description: `Permissões de ${permissionUser.name} foram atualizadas`,

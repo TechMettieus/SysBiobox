@@ -2,7 +2,12 @@ import { useState } from "react";
 import DashboardLayout from "@/components/DashboardLayout";
 import ProductionDashboard from "@/components/ProductionDashboard";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import ProductionReport from "@/components/ProductionReport";
 import ThermalPrintManager from "@/components/ThermalPrintManager";
 import NewProductionTask from "@/components/NewProductionTask";
@@ -50,7 +55,9 @@ export default function Production() {
         <Dialog open={showReport} onOpenChange={setShowReport}>
           <DialogContent className="max-w-5xl">
             <DialogHeader>
-              <DialogTitle className="sr-only">Relatório de Produção</DialogTitle>
+              <DialogTitle className="sr-only">
+                Relatório de Produção
+              </DialogTitle>
             </DialogHeader>
             <ProductionReport onClose={() => setShowReport(false)} />
           </DialogContent>
@@ -68,7 +75,9 @@ export default function Production() {
         <Dialog open={showNewTask} onOpenChange={setShowNewTask}>
           <DialogContent className="max-w-2xl">
             <DialogHeader>
-              <DialogTitle className="sr-only">Nova Tarefa de Produção</DialogTitle>
+              <DialogTitle className="sr-only">
+                Nova Tarefa de Produção
+              </DialogTitle>
             </DialogHeader>
             <NewProductionTask
               onClose={() => setShowNewTask(false)}
