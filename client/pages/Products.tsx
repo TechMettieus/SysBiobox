@@ -746,12 +746,18 @@ export default function Products() {
 
         <Dialog open={showBarcode} onOpenChange={setShowBarcode}>
           <DialogContent className="max-w-3xl">
+            <DialogHeader>
+              <DialogTitle className="sr-only">Gerar Códigos de Barra</DialogTitle>
+            </DialogHeader>
             <BarcodeGenerator />
           </DialogContent>
         </Dialog>
 
         <Dialog open={showLabels} onOpenChange={setShowLabels}>
           <DialogContent className="max-w-3xl">
+            <DialogHeader>
+              <DialogTitle className="sr-only">Imprimir Etiquetas</DialogTitle>
+            </DialogHeader>
             <ThermalPrintManager />
           </DialogContent>
         </Dialog>
