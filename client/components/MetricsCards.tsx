@@ -1,7 +1,5 @@
-// client/components/MetricsCards.tsx
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import {
   Package,
   Calendar,
@@ -12,17 +10,26 @@ import {
   Clock,
   CheckCircle,
 } from "lucide-react";
-import { useSupabase } from "@/hooks/useSupabase";
+import { useSupabase, Order } from "@/hooks/useSupabase";
+
+type MetricTrend = "up" | "down" | "neutral" | undefined;
 
 interface MetricCardProps {
   title: string;
   value: string | number;
   subtitle?: string;
   icon: React.ComponentType<{ className?: string }>;
-  trend?: "up" | "down" | "neutral";
+  trend?: MetricTrend;
   trendValue?: string;
   color?: "green" | "blue" | "orange" | "red";
 }
+
+const metricColors = {
+  green: "bg-biobox-green/10 text-biobox-green",
+  blue: "bg-blue-500/10 text-blue-500",
+  orange: "bg-orange-500/10 text-orange-500",
+  red: "bg-red-500/10 text-red-500",
+};
 
 function MetricCard({
   title,
@@ -33,25 +40,18 @@ function MetricCard({
   trendValue,
   color = "green",
 }: MetricCardProps) {
-  const colorClasses = {
-    green: "bg-biobox-green/10 text-biobox-green",
-    blue: "bg-blue-500/10 text-blue-500",
-    orange: "bg-orange-500/10 text-orange-500",
-    red: "bg-red-500/10 text-red-500",
-  };
-
   return (
-    <Card className="bg-card border-border hover:bg-card/80 transition-colors">
+    <Card className="bg-card border-border transition-colors hover:bg-card/80">
       <CardContent className="p-6">
         <div className="flex items-start justify-between">
           <div className="flex-1">
             <p className="text-sm font-medium text-muted-foreground">{title}</p>
-            <p className="text-2xl font-bold text-foreground mt-1">{value}</p>
+            <p className="mt-1 text-2xl font-bold text-foreground">{value}</p>
             {subtitle && (
-              <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{subtitle}</p>
             )}
             {trend && trendValue && (
-              <div className="flex items-center mt-2 space-x-1">
+              <div className="mt-2 flex items-center space-x-1">
                 {trend === "up" ? (
                   <TrendingUp className="h-3 w-3 text-biobox-green" />
                 ) : trend === "down" ? (
@@ -62,8 +62,8 @@ function MetricCard({
                     trend === "up"
                       ? "text-biobox-green"
                       : trend === "down"
-                        ? "text-red-500"
-                        : "text-muted-foreground"
+                      ? "text-red-500"
+                      : "text-muted-foreground"
                   }`}
                 >
                   {trendValue}
@@ -72,7 +72,7 @@ function MetricCard({
             )}
           </div>
           <div
-            className={`h-12 w-12 rounded-lg flex items-center justify-center ${colorClasses[color]}`}
+            className={`flex h-12 w-12 items-center justify-center rounded-lg ${metricColors[color]}`}
           >
             <Icon className="h-6 w-6" />
           </div>
@@ -81,6 +81,104 @@ function MetricCard({
     </Card>
   );
 }
+
+type EnrichedOrder = {
+  raw: Order;
+  status: Order["status"];
+  totalAmount: number;
+  createdAt: Date;
+  deliveryDate: Date | null;
+  completedDate: Date | null;
+};
+
+const normalizeStatus = (value: unknown): Order["status"] => {
+  const normalized =
+    typeof value === "string" ? value.toLowerCase() : (value as Order["status"] | undefined);
+  const validStatuses: Order["status"][] = [
+    "pending",
+    "confirmed",
+    "in_production",
+    "quality_check",
+    "ready",
+    "delivered",
+    "cancelled",
+  ];
+
+  return validStatuses.includes(normalized as Order["status"]) ? (normalized as Order["status"]) : "pending";
+};
+
+const toNumber = (value: unknown, fallback = 0): number => {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === "string" && value.trim() !== "") {
+    const parsed = Number(value.replace(/[^0-9,-]+/g, "").replace(",", "."));
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+  if (typeof value === "object" && value !== null) {
+    const maybeNumber = (value as { toNumber?: () => number }).toNumber?.();
+    if (typeof maybeNumber === "number" && Number.isFinite(maybeNumber)) {
+      return maybeNumber;
+    }
+  }
+  return fallback;
+};
+
+const parseDate = (value: unknown): Date | null => {
+  if (!value) {
+    return null;
+  }
+  if (value instanceof Date) {
+    return value;
+  }
+  if (typeof (value as { toDate?: () => Date }).toDate === "function") {
+    try {
+      return (value as { toDate: () => Date }).toDate();
+    } catch {
+      return null;
+    }
+  }
+  const parsed = new Date(value as string);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+
+const computeOrderTotalAmount = (order: Order): number => {
+  const direct = toNumber((order as any).total_amount);
+  if (direct > 0) {
+    return direct;
+  }
+
+  if (Array.isArray(order.products) && order.products.length > 0) {
+    const productsTotal = order.products.reduce((sum, product) => {
+      const productTotal = toNumber((product as any).total_price);
+      if (productTotal > 0) {
+        return sum + productTotal;
+      }
+      const quantity = toNumber((product as any).quantity, 1);
+      const unitPrice = toNumber((product as any).unit_price);
+      return sum + quantity * unitPrice;
+    }, 0);
+
+    if (productsTotal > 0) {
+      return productsTotal;
+    }
+  }
+
+  if (Array.isArray(order.fragments) && order.fragments.length > 0) {
+    const fragmentsTotal = order.fragments.reduce(
+      (sum, fragment) => sum + toNumber((fragment as any).value),
+      0,
+    );
+    if (fragmentsTotal > 0) {
+      return fragmentsTotal;
+    }
+  }
+
+  const alternative = toNumber((order as any).totalAmount);
+  return alternative > 0 ? alternative : 0;
+};
 
 export default function MetricsCards() {
   const [loading, setLoading] = useState(true);
@@ -92,10 +190,13 @@ export default function MetricsCards() {
     readyOrders: 0,
     monthlyRevenue: 0,
     completedToday: 0,
-    pendingValue: 0,
+    receivableValue: 0,
+    receivedValue: 0,
+    receivableOrders: 0,
+    deliveredOrders: 0,
   });
 
-  const { getOrders, getCustomers } = useSupabase();
+  const { getOrders } = useSupabase();
 
   useEffect(() => {
     loadMetrics();
@@ -104,67 +205,63 @@ export default function MetricsCards() {
   const loadMetrics = async () => {
     try {
       setLoading(true);
-      
-      // Buscar dados reais
-      const [orders, customers] = await Promise.all([
-        getOrders(),
-        getCustomers()
-      ]);
+      const orders = await getOrders();
 
       const now = new Date();
       const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
-      // Calcular métricas
-      const activeOrders = orders.filter((order) =>
-        ["pending", "confirmed", "in_production", "quality_check", "ready"].includes(
-          order.status,
-        ),
-      ).length;
+      const enrichedOrders: EnrichedOrder[] = orders.map((order) => {
+        const status = normalizeStatus((order as any).status);
+        const createdAt = parseDate((order as any).created_at) ?? now;
+        const deliveryDate = parseDate((order as any).delivery_date);
+        const completedDate = parseDate((order as any).completed_date);
+        const totalAmount = computeOrderTotalAmount(order);
 
-      const urgentOrders = orders.filter(
-        (order) =>
-          order.priority === "urgent" &&
-          !["delivered", "cancelled"].includes(order.status),
-      ).length;
-
-      const inProductionOrders = orders.filter(
-        (order) => order.status === "in_production",
-      ).length;
-
-      const readyOrders = orders.filter(
-        (order) => order.status === "ready",
-      ).length;
-
-      const delayedOrders = orders.filter(
-        (order) =>
-          order.delivery_date &&
-          new Date(order.delivery_date) < now &&
-          !["delivered", "cancelled"].includes(order.status),
-      ).length;
-
-      // Calcular receita do mês
-      const monthlyOrders = orders.filter(order => {
-        const orderDate = new Date(order.created_at);
-        return orderDate >= monthStart && order.status !== "cancelled";
+        return {
+          raw: { ...order, status } as Order,
+          status,
+          totalAmount,
+          createdAt,
+          deliveryDate,
+          completedDate,
+        };
       });
-      
-      const monthlyRevenue = monthlyOrders.reduce(
-        (sum, order) => sum + (order.total_amount || 0), 
-        0
+
+      const activeOrders = enrichedOrders.filter(({ status }) =>
+        ["pending", "confirmed", "in_production", "quality_check", "ready"].includes(status),
+      ).length;
+
+      const urgentOrders = enrichedOrders.filter(
+        ({ raw, status }) => raw.priority === "urgent" && !["delivered", "cancelled"].includes(status),
+      ).length;
+
+      const inProductionOrders = enrichedOrders.filter(({ status }) => status === "in_production").length;
+      const readyOrders = enrichedOrders.filter(({ status }) => status === "ready").length;
+
+      const delayedOrders = enrichedOrders.filter(
+        ({ status, deliveryDate }) =>
+          deliveryDate !== null &&
+          deliveryDate < now &&
+          !["delivered", "cancelled"].includes(status),
+      ).length;
+
+      const monthlyRevenue = enrichedOrders
+        .filter(({ status, createdAt }) => createdAt >= monthStart && status !== "cancelled")
+        .reduce((sum, entry) => sum + entry.totalAmount, 0);
+
+      const completedToday = enrichedOrders.filter(
+        ({ status, completedDate }) =>
+          status === "delivered" && completedDate !== null && completedDate >= today,
+      ).length;
+
+      const receivableEntries = enrichedOrders.filter(
+        ({ status }) => !["delivered", "cancelled"].includes(status),
       );
+      const receivableValue = receivableEntries.reduce((sum, entry) => sum + entry.totalAmount, 0);
 
-      // Pedidos concluídos hoje
-      const completedToday = orders.filter(order => {
-        if (order.status !== "delivered") return false;
-        const deliveryDate = order.completed_date ? new Date(order.completed_date) : null;
-        return deliveryDate && deliveryDate >= today;
-      }).length;
-
-      // Valor pendente de produção
-      const pendingValue = orders
-        .filter(o => ["pending", "confirmed", "in_production"].includes(o.status))
-        .reduce((sum, o) => sum + (o.total_amount || 0), 0);
+      const deliveredEntries = enrichedOrders.filter(({ status }) => status === "delivered");
+      const receivedValue = deliveredEntries.reduce((sum, entry) => sum + entry.totalAmount, 0);
 
       setMetrics({
         activeOrders,
@@ -174,7 +271,10 @@ export default function MetricsCards() {
         readyOrders,
         monthlyRevenue,
         completedToday,
-        pendingValue
+        receivableValue,
+        receivedValue,
+        receivableOrders: receivableEntries.length,
+        deliveredOrders: deliveredEntries.length,
       });
     } catch (error) {
       console.error("Erro ao carregar métricas:", error);
@@ -183,24 +283,24 @@ export default function MetricsCards() {
     }
   };
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat("pt-BR", {
+  const formatCurrency = (value: number) =>
+    new Intl.NumberFormat("pt-BR", {
       style: "currency",
       currency: "BRL",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
     }).format(value);
-  };
 
   if (loading) {
     return (
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {[...Array(4)].map((_, i) => (
-          <Card key={i} className="bg-card border-border">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+        {Array.from({ length: 6 }).map((_, index) => (
+          <Card key={index} className="bg-card border-border">
             <CardContent className="p-6">
-              <div className="animate-pulse">
-                <div className="h-4 bg-muted rounded w-1/2 mb-2"></div>
-                <div className="h-8 bg-muted rounded w-3/4"></div>
+              <div className="animate-pulse space-y-2">
+                <div className="h-4 w-1/2 rounded bg-muted" />
+                <div className="h-8 w-3/4 rounded bg-muted" />
+                <div className="h-3 w-2/3 rounded bg-muted" />
               </div>
             </CardContent>
           </Card>
@@ -209,51 +309,92 @@ export default function MetricsCards() {
     );
   }
 
-  // Calcular tendências (comparando com período anterior)
-  const revenueTarget = 180000; // Meta mensal configurável
-  const revenuePercentage = Math.round((metrics.monthlyRevenue / revenueTarget) * 100);
-  const revenueTrend = revenuePercentage >= 50 ? "up" : "down";
+  const revenueTarget = 180000;
+  const revenuePercentage = revenueTarget > 0 ? Math.round((metrics.monthlyRevenue / revenueTarget) * 100) : 0;
+  const revenueTrend: MetricTrend = revenuePercentage >= 50 ? "up" : metrics.monthlyRevenue > 0 ? "down" : "neutral";
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+      <MetricCard
+        title="Valor a Receber"
+        value={formatCurrency(metrics.receivableValue)}
+        subtitle={`${metrics.receivableOrders} pedido${metrics.receivableOrders !== 1 ? "s" : ""} aguardando entrega`}
+        icon={Clock}
+        color="orange"
+      />
+
+      <MetricCard
+        title="Valor Recebido"
+        value={formatCurrency(metrics.receivedValue)}
+        subtitle={`${metrics.deliveredOrders} pedido${metrics.deliveredOrders !== 1 ? "s" : ""} entregues`}
+        icon={CheckCircle}
+        color="green"
+      />
+
       <MetricCard
         title="Pedidos Ativos"
         value={metrics.activeOrders}
-        subtitle={`${metrics.urgentOrders} urgente${metrics.urgentOrders !== 1 ? 's' : ''}`}
+        subtitle={`${metrics.urgentOrders} urgente${metrics.urgentOrders !== 1 ? "s" : ""}`}
         icon={Calendar}
-        trend={metrics.activeOrders > 0 ? "up" : "neutral"}
-        trendValue={metrics.delayedOrders > 0 ? `${metrics.delayedOrders} atrasado${metrics.delayedOrders !== 1 ? 's' : ''}` : "Sem atrasos"}
+        trend={
+          metrics.delayedOrders > 0
+            ? "down"
+            : metrics.activeOrders > 0
+            ? "up"
+            : "neutral"
+        }
+        trendValue={
+          metrics.delayedOrders > 0
+            ? `${metrics.delayedOrders} atrasado${metrics.delayedOrders !== 1 ? "s" : ""}`
+            : "Sem atrasos"
+        }
         color="blue"
       />
-      
+
       <MetricCard
         title="Em Produção"
         value={metrics.inProductionOrders}
-        subtitle="Sendo fabricados agora"
+        subtitle={`${metrics.readyOrders} pronto${metrics.readyOrders !== 1 ? "s" : ""} para entrega`}
         icon={Package}
         trend={metrics.inProductionOrders > 0 ? "up" : "neutral"}
-        trendValue={`${metrics.readyOrders} pronto${metrics.readyOrders !== 1 ? 's' : ''} para entrega`}
+        trendValue={
+          metrics.readyOrders > 0
+            ? `${metrics.readyOrders} etapa${metrics.readyOrders !== 1 ? "s" : ""} concluída${
+                metrics.readyOrders !== 1 ? "s" : ""
+              }`
+            : "Planejamento em dia"
+        }
         color="orange"
       />
-      
+
       <MetricCard
         title="Concluídos Hoje"
         value={metrics.completedToday}
         subtitle="Entregas realizadas"
-        icon={CheckCircle}
+        icon={Truck}
         trend={metrics.completedToday > 0 ? "up" : "neutral"}
-        trendValue={metrics.completedToday > 0 ? "Meta diária atingida" : "Nenhuma entrega hoje"}
+        trendValue={
+          metrics.completedToday > 0
+            ? "Meta diária em andamento"
+            : "Nenhuma entrega hoje"
+        }
         color="green"
       />
-      
+
       <MetricCard
         title="Receita Mensal"
         value={formatCurrency(metrics.monthlyRevenue)}
         subtitle={`Meta: ${formatCurrency(revenueTarget)}`}
         icon={DollarSign}
         trend={revenueTrend}
-        trendValue={`${revenuePercentage}% da meta`}
-        color={revenuePercentage >= 80 ? "green" : revenuePercentage >= 50 ? "orange" : "red"}
+        trendValue={`${Math.max(0, revenuePercentage)}% da meta`}
+        color={
+          revenuePercentage >= 80
+            ? "green"
+            : revenuePercentage >= 50
+            ? "orange"
+            : "red"
+        }
       />
     </div>
   );

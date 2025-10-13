@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useState } from "react";
 import DashboardLayout from "@/components/DashboardLayout";
 import ProductionDashboard from "@/components/ProductionDashboard";
 import { Button } from "@/components/ui/button";
@@ -12,6 +13,7 @@ export default function Production() {
   const [showReport, setShowReport] = useState(false);
   const [showPrint, setShowPrint] = useState(false);
   const [showNewTask, setShowNewTask] = useState(false);
+  const [refreshToken, setRefreshToken] = useState(0);
 
   return (
     <DashboardLayout>
@@ -44,7 +46,7 @@ export default function Production() {
           </div>
         </div>
 
-        <ProductionDashboard />
+        <ProductionDashboard refreshToken={refreshToken} />
 
         <Dialog open={showReport} onOpenChange={setShowReport}>
           <DialogContent className="max-w-5xl">
@@ -60,7 +62,10 @@ export default function Production() {
 
         <Dialog open={showNewTask} onOpenChange={setShowNewTask}>
           <DialogContent className="max-w-2xl">
-            <NewProductionTask onClose={() => setShowNewTask(false)} />
+            <NewProductionTask
+              onClose={() => setShowNewTask(false)}
+              onSaved={() => setRefreshToken((value) => value + 1)}
+            />
           </DialogContent>
         </Dialog>
       </div>
