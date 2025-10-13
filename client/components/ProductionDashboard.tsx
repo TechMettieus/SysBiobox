@@ -369,21 +369,42 @@ export default function ProductionDashboard({ tasks, refreshToken }: ProductionD
   }, [storedTasks, mapStoredTaskToProductionTask]);
 
   const mergedTasks = useMemo(() => {
-    const baseTasks = tasks || [];
+    const baseMap = new Map<string, ProductionTask>();
+
+    localProductionTasks.forEach((task) => {
+      baseMap.set(task.id, task);
+    });
+
+    (tasks ?? []).forEach((task) => {
+      baseMap.set(task.id, task);
+    });
+
+    const baseTasks = Array.from(baseMap.values());
+
     const orderTasks = orders
       .filter((order) => PRODUCTION_STATUSES.includes(normalizeStatus(order.status)))
       .map(mapOrderToTask);
 
-    const existingOrderIds = new Set(baseTasks.map((task) => task.orderId));
+    const existingOrderIds = new Set(
+      baseTasks
+        .map((task) => task.orderId)
+        .filter((id): id is string => Boolean(id)),
+    );
+
     const combined = [
       ...baseTasks,
-      ...orderTasks.filter((task) => !existingOrderIds.has(task.orderId)),
+      ...orderTasks.filter((task) => task.orderId && !existingOrderIds.has(task.orderId)),
     ];
 
-    return combined
+    const dedupById = new Map<string, ProductionTask>();
+    combined.forEach((task) => {
+      dedupById.set(task.id, task);
+    });
+
+    return Array.from(dedupById.values())
       .sort((a, b) => a.stageOrder - b.stageOrder || b.progress - a.progress)
       .map(enrichTask);
-  }, [tasks, orders]);
+  }, [tasks, orders, localProductionTasks]);
 
   const taskStats = useMemo(() => {
     const active = mergedTasks.filter((task) => task.status === "in_progress").length;
