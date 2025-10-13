@@ -262,11 +262,11 @@ export default function UserManagement() {
           updated_at: serverTimestamp(),
         };
 
-        // Salvar no Firestore
+        // Salvar no Firestore com o mesmo UID do Auth
         if (isFirebaseConfigured && db) {
           try {
-            await addDoc(
-              collection(db, "users"),
+            await setDoc(
+              doc(db, "users", userId),
               sanitizeForFirestore({
                 ...newUserData,
                 uid: userId,
