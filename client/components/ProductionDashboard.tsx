@@ -20,6 +20,7 @@ import { useSupabase } from "@/hooks/useSupabase";
 
 interface ProductionDashboardProps {
   tasks?: ProductionTask[];
+  refreshToken?: number;
 }
 
 interface EnrichedTask extends ProductionTask {
