@@ -1,4 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
+import { createRoot } from 'react-dom/client';
+import OrderPrintTemplate from "@/components/OrderPrintTemplate";
 import DashboardLayout from "@/components/DashboardLayout";
 import NewOrderForm from "@/components/NewOrderForm";
 import OrderFragmentForm from "@/components/OrderFragmentForm";
@@ -641,58 +643,66 @@ export default function OrdersSupabase() {
   };
 
   const handlePrintOrder = (order: Order | null) => {
-    if (!order) return;
-    const printWindow = window.open("", "_blank");
-    if (printWindow) {
-      printWindow.document.write(`
-        <html>
-          <head>
-            <title>Pedido ${order.order_number}</title>
-            <style>
-              body { font-family: monospace; padding: 20px; }
-              pre { white-space: pre-wrap; }
-            </style>
-          </head>
-          <body>
-            <pre>
-      ========================================
-      PEDIDO #${order.order_number}
-      ========================================
+  if (!order) return;
+   const printWindow = window.open("", "_blank");
+   if (printWindow) {
+    // Configurar documento HTML
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <title>Pedido ${order.order_number}</title>
+          <style>
+            @media print {
+              @page {
+                size: A4;
+                margin: 0;
+              }
+              body {
+                margin: 0;
+                padding: 0;
+              }
+              .print-template {
+                page-break-after: always;
+              }
+            }
+            body {
+              margin: 0;
+              padding: 0;
+              font-family: Arial, sans-serif;
+            }
+          </style>
+        </head>
+        <body>
+          <div id="print-root"></div>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
 
-      CLIENTE: ${order.customer_name}
-      TELEFONE: ${order.customer_phone}
-      EMAIL: ${order.customer_email || "N/A"}
 
-      VENDEDOR: ${order.seller_name}
-      STATUS: ${statusLabels[order.status]}
-      PRIORIDADE: ${priorityLabels[order.priority]}
-
-      DATA PRODUÇÃO: ${formatDate(order.scheduled_date)}
-      DATA ENTREGA: ${order.delivery_date ? formatDate(order.delivery_date) : "N/A"}
-      PROGRESSO: ${order.production_progress}%
-
-      ${order.assigned_operator ? `OPERADOR: ${order.assigned_operator}` : ""}
-      ${order.notes ? `\nOBSERVAÇÕES:\n${order.notes}\n` : ""}
-
-      VALOR TOTAL: ${formatCurrency(order.total_amount || 0)}
-
-      ========================================
-      Data de Impressão: ${new Date().toLocaleString("pt-BR")}
-      ========================================
-            </pre>
-            <script>
-              window.onload = function() {
-                window.print();
-                setTimeout(function() { window.close(); }, 100);
-              };
-            </script>
-          </body>
-        </html>
-      `);
-      printWindow.document.close();
+// Criar container React e renderizar o template
+    const container = printWindow.document.getElementById('print-root');
+    if (container) {
+      const root = createRoot(container);
+      root.render(<OrderPrintTemplate order={order} />);
+      
+      // Aguardar renderização e imprimir
+      setTimeout(() => {
+        printWindow.focus();
+        printWindow.print();
+        
+        // Fechar após impressão (opcional)
+        setTimeout(() => {
+          printWindow.close();
+        }, 100);
+      }, 500);
     }
-  };
+  }
+};
 
+    
   const handleExportReport = () => {
     const csvContent = [
       ["Pedido", "Cliente", "Vendedor", "Status", "Prioridade", "Data Produção", "Data Entrega", "Valor", "Progresso"].join(","),
