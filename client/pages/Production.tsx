@@ -13,6 +13,7 @@ export default function Production() {
   const [showReport, setShowReport] = useState(false);
   const [showPrint, setShowPrint] = useState(false);
   const [showNewTask, setShowNewTask] = useState(false);
+  const [refreshToken, setRefreshToken] = useState(0);
 
   return (
     <DashboardLayout>
