@@ -220,11 +220,66 @@ const enrichTask = (task: ProductionTask): EnrichedTask => {
 export default function ProductionDashboard({ tasks, refreshToken }: ProductionDashboardProps) {
   const { getOrders } = useSupabase();
   const [orders, setOrders] = useState<Order[]>([]);
+  const [storedTasks, setStoredTasks] = useState<StoredTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedTask, setSelectedTask] = useState<EnrichedTask | null>(null);
 
+  const loadStoredTasks = useCallback(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    try {
+      const raw = window.localStorage.getItem("biobox_tasks");
+      if (!raw) {
+        setStoredTasks([]);
+        return;
+      }
+
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) {
+        setStoredTasks([]);
+        return;
+      }
+
+      const sanitized = parsed
+        .filter(
+          (item): item is StoredTask =>
+            item !== null &&
+            typeof item === "object" &&
+            typeof (item as StoredTask).id === "string" &&
+            typeof (item as StoredTask).order_id === "string",
+        )
+        .map((item) => item as StoredTask);
+
+      setStoredTasks(sanitized);
+    } catch (error) {
+      console.error("Erro ao carregar tarefas locais:", error);
+      setStoredTasks([]);
+    }
+  }, []);
+
   useEffect(() => {
-    const loadOrders = async () => {
+    loadStoredTasks();
+  }, [loadStoredTasks, refreshToken]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === "biobox_tasks") {
+        loadStoredTasks();
+      }
+    };
+
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
+  }, [loadStoredTasks]);
+
+  useEffect(() => {
+    const fetchOrders = async () => {
       try {
         setLoading(true);
         const ordersData = await getOrders();
@@ -234,7 +289,7 @@ export default function ProductionDashboard({ tasks, refreshToken }: ProductionD
       }
     };
 
-    loadOrders();
+    fetchOrders();
   }, [getOrders]);
 
   const mergedTasks = useMemo(() => {
