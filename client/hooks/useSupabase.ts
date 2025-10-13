@@ -284,30 +284,43 @@ export function useSupabase() {
   };
 
   const getOrders = async (): Promise<Order[]> => {
+    // Prefer Firestore when configured, but be resilient
     if (isConnected && db) {
-      let q;
-      if (user?.role === "admin") {
-        q = query(collection(db, "orders"), orderBy("created_at", "desc"));
-      } else {
-        q = query(
-          collection(db, "orders"),
-          where("seller_id", "==", user?.id || "__none__"),
-          orderBy("created_at", "desc"),
-        );
+      try {
+        const base = collection(db, "orders");
+        const shouldFetchAll = !user || user.role === "admin";
+        const q = shouldFetchAll
+          ? query(base, orderBy("created_at", "desc"))
+          : query(
+              base,
+              where("seller_id", "==", user.id),
+              orderBy("created_at", "desc"),
+            );
+
+        const snap = await getDocs(q);
+
+        if (snap.empty) {
+          const stored = localStorage.getItem("biobox_orders");
+          return stored ? JSON.parse(stored) : [];
+        }
+
+        return snap.docs.map((d) => {
+          const data = d.data() as any;
+          const created = (data.created_at?.toDate?.() as Date) || new Date();
+          const updated = (data.updated_at?.toDate?.() as Date) || created;
+          const { id: _ignored, ...dataWithoutId } = data;
+          return {
+            ...dataWithoutId,
+            id: d.id,
+            created_at: created.toISOString(),
+            updated_at: updated.toISOString(),
+          } as Order;
+        });
+      } catch (err) {
+        console.warn("getOrders fallback to localStorage due to error:", err);
+        const stored = localStorage.getItem("biobox_orders");
+        return stored ? JSON.parse(stored) : [];
       }
-      const snap = await getDocs(q);
-      return snap.docs.map((d) => {
-        const data = d.data() as any;
-        const created = (data.created_at?.toDate?.() as Date) || new Date();
-        const updated = (data.updated_at?.toDate?.() as Date) || created;
-        const { id: _, ...dataWithoutId } = data;
-        return {
-          ...dataWithoutId,
-          id: d.id,
-          created_at: created.toISOString(),
-          updated_at: updated.toISOString(),
-        } as Order;
-      });
     }
 
     const stored = localStorage.getItem("biobox_orders");
@@ -421,12 +434,12 @@ export function useSupabase() {
 
   const deleteOrder = async (orderId: string): Promise<boolean> => {
     try {
-      console.log('🗑️ Deletando pedido:', orderId);
-      
+      console.log("🗑️ Deletando pedido:", orderId);
+
       if (isConnected && db) {
         await deleteDoc(doc(db, "orders", orderId));
-        console.log('✅ Pedido deletado do Firebase');
-        
+        console.log("✅ Pedido deletado do Firebase");
+
         // Log de atividade
         await logActivity({
           userId: user?.id,
@@ -438,18 +451,18 @@ export function useSupabase() {
           description: `Pedido ${orderId} excluído por ${user?.name}`,
           metadata: {},
         });
-        
+
         return true;
       }
-      
+
       // Fallback para localStorage
       const orders = await getOrders();
       const filtered = orders.filter((o) => o.id !== orderId);
       localStorage.setItem("biobox_orders", JSON.stringify(filtered));
-      console.log('✅ Pedido removido do localStorage');
+      console.log("✅ Pedido removido do localStorage");
       return true;
     } catch (error) {
-      console.error('❌ Erro ao deletar pedido:', error);
+      console.error("❌ Erro ao deletar pedido:", error);
       return false;
     }
   };
@@ -673,7 +686,7 @@ export function useSupabase() {
     getOrders,
     createOrder,
     updateOrder,
-    deleteOrder,  // ← FUNÇÃO ADICIONADA NA EXPORTAÇÃO
+    deleteOrder, // ← FUNÇÃO ADICIONADA NA EXPORTAÇÃO
     createProduct,
     updateProduct,
     deleteProduct,

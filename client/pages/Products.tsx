@@ -15,7 +15,12 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import ProductForm, { ProductFormValues } from "@/components/ProductForm";
 import BarcodeGenerator from "@/components/BarcodeGenerator";
 import ThermalPrintManager from "@/components/ThermalPrintManager";
@@ -59,14 +64,17 @@ export default function Products() {
   const { toast } = useToast();
 
   const [products, setProducts] = useState<Product[]>([]);
-  const [rawMaterials, setRawMaterials] = useState<RawMaterial[]>(mockRawMaterials);
+  const [rawMaterials, setRawMaterials] =
+    useState<RawMaterial[]>(mockRawMaterials);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [showProductForm, setShowProductForm] = useState(false);
   const [showBarcode, setShowBarcode] = useState(false);
   const [showLabels, setShowLabels] = useState(false);
   const [savingProduct, setSavingProduct] = useState(false);
-  const [deletingProductId, setDeletingProductId] = useState<string | null>(null);
+  const [deletingProductId, setDeletingProductId] = useState<string | null>(
+    null,
+  );
 
   // Sincronizar produtos do hook com o estado local
   useEffect(() => {
@@ -83,7 +91,7 @@ export default function Products() {
   const handleCreateProduct = async (formData: ProductFormValues) => {
     try {
       setSavingProduct(true);
-      
+
       const modelId =
         typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
           ? crypto.randomUUID()
@@ -94,11 +102,11 @@ export default function Products() {
         name: formData.name.trim(),
         sku: formData.sku.trim(),
         category: formData.category,
-        description: formData.description || '',
+        description: formData.description || "",
         basePrice: formData.basePrice || 0,
         costPrice: formData.costPrice || 0,
         margin: formData.margin || 0,
-        status: formData.status || 'active',
+        status: formData.status || "active",
         models: [
           {
             id: modelId,
@@ -117,19 +125,19 @@ export default function Products() {
       };
 
       // Adicionar barcode apenas se tiver valor
-      if (formData.barcode && formData.barcode.trim() !== '') {
+      if (formData.barcode && formData.barcode.trim() !== "") {
         productData.barcode = formData.barcode.trim();
       }
 
-      console.log('🔄 Criando produto:', productData);
-      
+      console.log("🔄 Criando produto:", productData);
+
       const saved = await createProduct(productData);
-      
-      console.log('✅ Produto criado com sucesso:', saved);
-      
+
+      console.log("✅ Produto criado com sucesso:", saved);
+
       setSelectedProduct(saved);
       setShowProductForm(false);
-      
+
       toast({
         title: "Produto criado",
         description: "O produto foi salvo com sucesso no Firestore.",
@@ -138,7 +146,8 @@ export default function Products() {
       console.error("❌ Erro ao criar produto:", error);
       toast({
         title: "Erro ao salvar produto",
-        description: (error as Error).message || "Não foi possível salvar o produto.",
+        description:
+          (error as Error).message || "Não foi possível salvar o produto.",
         variant: "destructive",
       });
     } finally {
@@ -146,7 +155,10 @@ export default function Products() {
     }
   };
 
-  const handleDeleteProduct = async (e: React.MouseEvent, productId: string) => {
+  const handleDeleteProduct = async (
+    e: React.MouseEvent,
+    productId: string,
+  ) => {
     e.stopPropagation();
 
     const product = products.find((p) => p.id === productId);
@@ -164,15 +176,15 @@ export default function Products() {
 
     try {
       setDeletingProductId(productId);
-      
-      console.log('🗑️ Excluindo produto:', productId);
-      
+
+      console.log("🗑️ Excluindo produto:", productId);
+
       await deleteProductFn(productId);
-      
-      console.log('✅ Produto excluído com sucesso');
-      
+
+      console.log("✅ Produto excluído com sucesso");
+
       setSelectedProduct((prev) => (prev?.id === productId ? null : prev));
-      
+
       toast({
         title: "Produto excluído",
         description: "O produto foi removido com sucesso.",
@@ -181,7 +193,8 @@ export default function Products() {
       console.error("❌ Erro ao excluir produto:", error);
       toast({
         title: "Erro ao excluir produto",
-        description: (error as Error).message || "Não foi possível excluir o produto.",
+        description:
+          (error as Error).message || "Não foi possível excluir o produto.",
         variant: "destructive",
       });
     } finally {
@@ -199,10 +212,6 @@ export default function Products() {
     (product) =>
       product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       product.sku.toLowerCase().includes(searchTerm.toLowerCase()),
-  );
-
-  const filteredMaterials = rawMaterials.filter((material) =>
-    material.name.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
   // Statistics
@@ -491,7 +500,6 @@ export default function Products() {
           <div className="flex items-center justify-between">
             <TabsList>
               <TabsTrigger value="products">Catálogo de Produtos</TabsTrigger>
-              <TabsTrigger value="materials">Matéria Prima</TabsTrigger>
               <TabsTrigger value="barcode">Códigos de Barra</TabsTrigger>
             </TabsList>
 
@@ -536,14 +544,6 @@ export default function Products() {
                 ))}
               </div>
             )}
-          </TabsContent>
-
-          <TabsContent value="materials">
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {filteredMaterials.map((material) => (
-                <MaterialCard key={material.id} material={material} />
-              ))}
-            </div>
           </TabsContent>
 
           <TabsContent value="barcode">
@@ -757,12 +757,20 @@ export default function Products() {
 
         <Dialog open={showBarcode} onOpenChange={setShowBarcode}>
           <DialogContent className="max-w-3xl">
+            <DialogHeader>
+              <DialogTitle className="sr-only">
+                Gerar Códigos de Barra
+              </DialogTitle>
+            </DialogHeader>
             <BarcodeGenerator />
           </DialogContent>
         </Dialog>
 
         <Dialog open={showLabels} onOpenChange={setShowLabels}>
           <DialogContent className="max-w-3xl">
+            <DialogHeader>
+              <DialogTitle className="sr-only">Imprimir Etiquetas</DialogTitle>
+            </DialogHeader>
             <ThermalPrintManager />
           </DialogContent>
         </Dialog>
