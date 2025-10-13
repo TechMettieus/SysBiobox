@@ -1,552 +1,544 @@
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { 
-  Play, 
-  Pause, 
-  Square, 
-  Clock, 
-  User, 
+import {
+  Play,
+  Pause,
+  Square,
+  Clock,
   AlertTriangle,
-  CheckCircle,
-  Settings,
-  Activity,
-  Users,
   Package,
   TrendingUp,
-  Wrench
+  CheckCircle,
 } from "lucide-react";
 import {
   ProductionTask,
-  ProductionLine,
-  Operator,
   productionStages,
   statusColors,
   statusLabels,
   priorityColors,
-  operatorStatusColors,
-  operatorStatusLabels
 } from "@/types/production";
 import { Order } from "@/hooks/useSupabase";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useSupabase } from "@/hooks/useSupabase";
-import { useEffect, useState } from "react";
 
 interface ProductionDashboardProps {
   tasks?: ProductionTask[];
-  lines?: ProductionLine[];
-  operators?: Operator[];
 }
 
-export default function ProductionDashboard({
-  tasks,
-  lines,
-  operators
-}: ProductionDashboardProps) {
+interface EnrichedTask extends ProductionTask {
+  dueInMinutes?: number;
+}
+
+const PRODUCTION_STATUSES: Order["status"][] = [
+  "confirmed",
+  "in_production",
+  "quality_check",
+  "ready",
+];
+
+const normalizeStatus = (value: unknown): Order["status"] => {
+  if (typeof value === "string") {
+    const candidate = value.toLowerCase() as Order["status"];
+    if (PRODUCTION_STATUSES.concat(["pending", "delivered", "cancelled"]).includes(candidate)) {
+      return candidate;
+    }
+  }
+  return "pending";
+};
+
+const toNumber = (value: unknown, fallback = 0): number => {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === "string" && value.trim() !== "") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  }
+  if (typeof value === "object" && value !== null) {
+    const maybeNumber = (value as { toNumber?: () => number }).toNumber?.();
+    if (typeof maybeNumber === "number" && Number.isFinite(maybeNumber)) {
+      return maybeNumber;
+    }
+  }
+  return fallback;
+};
+
+const parseDate = (value: unknown): Date | undefined => {
+  if (!value) {
+    return undefined;
+  }
+  if (value instanceof Date) {
+    return value;
+  }
+  if (typeof (value as { toDate?: () => Date }).toDate === "function") {
+    try {
+      return (value as { toDate: () => Date }).toDate();
+    } catch {
+      return undefined;
+    }
+  }
+  const parsed = new Date(value as string);
+  return Number.isNaN(parsed.getTime()) ? undefined : parsed;
+};
+
+const orderStatusToTaskStage = (status: Order["status"]): ProductionTask["status"] => {
+  switch (status) {
+    case "confirmed":
+      return "pending";
+    case "in_production":
+    case "quality_check":
+    case "ready":
+      return "in_progress";
+    case "delivered":
+      return "completed";
+    default:
+      return "pending";
+  }
+};
+
+const orderStatusToProductionStage = (status: Order["status"]): string => {
+  switch (status) {
+    case "confirmed":
+      return "cutting";
+    case "in_production":
+      return "assembly";
+    case "quality_check":
+      return "quality_control";
+    case "ready":
+      return "packaging";
+    default:
+      return "design";
+  }
+};
+
+const computeProgress = (order: Order): number => {
+  const progress = toNumber((order as any).production_progress);
+  if (progress > 0) {
+    return Math.min(progress, 100);
+  }
+
+  const status = normalizeStatus((order as any).status);
+  switch (status) {
+    case "confirmed":
+      return 10;
+    case "in_production":
+      return 60;
+    case "quality_check":
+      return 85;
+    case "ready":
+      return 95;
+    case "delivered":
+      return 100;
+    default:
+      return 0;
+  }
+};
+
+const mapOrderToTask = (order: Order): ProductionTask => {
+  const status = normalizeStatus(order.status);
+  const stageId = orderStatusToProductionStage(status);
+  const stage = productionStages.find((item) => item.id === stageId);
+
+  return {
+    id: `task-${order.id}`,
+    orderId: order.id,
+    orderNumber: order.order_number,
+    productName: order.products?.[0]?.product_name || "Pedido";
+    customerId: order.customer_id,
+    customerName: order.customer_name || "Cliente",
+    stage: stage?.id || "design",
+    stageOrder: stage?.order ?? 1,
+    status: orderStatusToTaskStage(status),
+    priority: (order.priority || "medium") as ProductionTask["priority"],
+    assignedOperator: order.assigned_operator || undefined,
+    startTime: parseDate(order.started_at) || parseDate(order.updated_at),
+    estimatedCompletionTime: parseDate(order.delivery_date),
+    actualCompletionTime: parseDate(order.completed_date),
+    progress: computeProgress(order),
+    notes: order.notes || undefined,
+  };
+};
+
+const enrichTask = (task: ProductionTask): EnrichedTask => {
+  const dueInMinutes = task.estimatedCompletionTime
+    ? Math.floor((task.estimatedCompletionTime.getTime() - Date.now()) / 60000)
+    : undefined;
+
+  return {
+    ...task,
+    dueInMinutes,
+  };
+};
+
+export default function ProductionDashboard({ tasks }: ProductionDashboardProps) {
   const { getOrders } = useSupabase();
   const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedTask, setSelectedTask] = useState<EnrichedTask | null>(null);
 
   useEffect(() => {
     const loadOrders = async () => {
-      const ordersData = await getOrders();
-      setOrders(ordersData);
+      try {
+        setLoading(true);
+        const ordersData = await getOrders();
+        setOrders(ordersData);
+      } finally {
+        setLoading(false);
+      }
     };
+
     loadOrders();
-  }, []);
+  }, [getOrders]);
 
-  // Generate real production data from orders
-  const generateRealProductionTasks = (): ProductionTask[] => {
-    return orders
-      .filter(order => ['confirmed', 'in_production', 'quality_check'].includes(order.status))
-      .map(order => ({
-        id: `task-${order.id}`,
-        orderId: order.id,
-        orderNumber: order.order_number,
-        productName: 'Produto',
-        customerId: order.customer_id,
-        customerName: order.customer_name,
-        stage: order.status === 'confirmed' ? 'cutting' : 
-               order.status === 'in_production' ? 'assembly' : 'quality_control',
-        stageOrder: order.status === 'confirmed' ? 2 : 
-                   order.status === 'in_production' ? 3 : 6,
-        status: order.status === 'confirmed' ? 'pending' as const :
-                order.status === 'in_production' ? 'in_progress' as const : 'in_progress' as const,
-        priority: order.priority,
-        assignedOperator: order.assigned_operator,
-        startTime: order.status === 'in_production' ? new Date(Date.now() - 2 * 60 * 60 * 1000) : undefined,
-        estimatedCompletionTime: order.delivery_date ? new Date(order.delivery_date) : undefined,
-        progress: order.production_progress,
-        notes: order.notes
-      }));
-  };
+  const mergedTasks = useMemo(() => {
+    const baseTasks = tasks || [];
+    const orderTasks = orders
+      .filter((order) => PRODUCTION_STATUSES.includes(normalizeStatus(order.status)))
+      .map(mapOrderToTask);
 
-  const generateRealProductionLines = (): ProductionLine[] => {
-    const activeOrders = orders.filter(o => o.status === 'in_production');
-    return [
-      {
-        id: '1',
-        name: 'Linha A - Camas Premium',
-        status: activeOrders.length > 0 ? 'active' as const : 'inactive' as const,
-        currentOrder: activeOrders[0]?.order_number,
-        operatorId: '1',
-        operatorName: activeOrders[0]?.assigned_operator || 'Disponível',
-        efficiency: 95,
-        dailyTarget: 3,
-        dailyProduced: Math.floor(Math.random() * 3) + 1,
-        lastUpdate: new Date()
-      },
-      {
-        id: '2',
-        name: 'Linha B - Camas Standard',
-        status: activeOrders.length > 1 ? 'active' as const : 'inactive' as const,
-        currentOrder: activeOrders[1]?.order_number,
-        operatorId: '2',
-        operatorName: activeOrders[1]?.assigned_operator || 'Disponível',
-        efficiency: 92,
-        dailyTarget: 4,
-        dailyProduced: Math.floor(Math.random() * 4) + 1,
-        lastUpdate: new Date()
-      },
-      {
-        id: '3',
-        name: 'Linha C - Acabamento',
-        status: 'maintenance' as const,
-        efficiency: 0,
-        dailyTarget: 5,
-        dailyProduced: 0,
-        lastUpdate: new Date()
-      }
+    const existingOrderIds = new Set(baseTasks.map((task) => task.orderId));
+    const combined = [
+      ...baseTasks,
+      ...orderTasks.filter((task) => !existingOrderIds.has(task.orderId)),
     ];
-  };
 
-  const generateRealOperators = (): Operator[] => {
-    return [
-      {
-        id: '1',
-        name: 'Carlos Mendes',
-        skills: ['cutting', 'carpentry', 'assembly'],
-        experience: 8,
-        efficiency: 95,
-        currentTask: tasks?.find(t => t.assignedOperator === 'Carlos Mendes')?.id,
-        status: tasks?.some(t => t.assignedOperator === 'Carlos Mendes' && t.status === 'in_progress') 
-          ? 'busy' as const : 'available' as const,
-        shift: 'morning' as const
-      },
-      {
-        id: '2',
-        name: 'Ana Lima',
-        skills: ['upholstery', 'sewing', 'finishing'],
-        experience: 6,
-        efficiency: 92,
-        currentTask: tasks?.find(t => t.assignedOperator === 'Ana Lima')?.id,
-        status: tasks?.some(t => t.assignedOperator === 'Ana Lima' && t.status === 'in_progress') 
-          ? 'busy' as const : 'available' as const,
-        shift: 'morning' as const
-      },
-      {
-        id: '3',
-        name: 'José Roberto',
-        skills: ['design', 'measurement', 'quality_control'],
-        experience: 12,
-        efficiency: 98,
-        status: 'available' as const,
-        shift: 'morning' as const
-      },
-      {
-        id: '4',
-        name: 'Maria Silva',
-        skills: ['cutting', 'material_handling', 'packaging'],
-        experience: 4,
-        efficiency: 88,
-        status: 'break' as const,
-        shift: 'morning' as const
-      },
-      {
-        id: '5',
-        name: 'Pedro Santos',
-        skills: ['carpentry', 'assembly', 'finishing'],
-        experience: 10,
-        efficiency: 94,
-        currentTask: tasks?.find(t => t.assignedOperator === 'Pedro Santos')?.id,
-        status: tasks?.some(t => t.assignedOperator === 'Pedro Santos' && t.status === 'in_progress') 
-          ? 'busy' as const : 'available' as const,
-        shift: 'afternoon' as const
-      }
-    ];
-  };
+    return combined
+      .sort((a, b) => a.stageOrder - b.stageOrder || b.progress - a.progress)
+      .map(enrichTask);
+  }, [tasks, orders]);
 
-  // Use real data or provided data
-  const realTasks = tasks || generateRealProductionTasks();
-  const realLines = lines || generateRealProductionLines();
-  const realOperators = operators || generateRealOperators();
+  const taskStats = useMemo(() => {
+    const active = mergedTasks.filter((task) => task.status === "in_progress").length;
+    const pending = mergedTasks.filter((task) => task.status === "pending").length;
+    const completed = mergedTasks.filter((task) => task.status === "completed").length;
+    const delayed = mergedTasks.filter(
+      (task) =>
+        typeof task.dueInMinutes === "number" && task.dueInMinutes < 0 && task.status !== "completed",
+    ).length;
 
-  const [selectedTask, setSelectedTask] = useState<ProductionTask | null>(null);
+    const averageProgress = mergedTasks.length
+      ? Math.round(
+          mergedTasks.reduce((sum, task) => sum + task.progress, 0) / mergedTasks.length,
+        )
+      : 0;
 
-  // Statistics
-  const activeTasks = realTasks.filter(t => t.status === 'in_progress').length;
-  const completedToday = realTasks.filter(t => 
-    t.status === 'completed' && 
-    t.actualCompletionTime && 
-    new Date(t.actualCompletionTime).toDateString() === new Date().toDateString()
-  ).length;
-  const blockedTasks = realTasks.filter(t => t.status === 'blocked').length;
-  const availableOperators = realOperators.filter(o => o.status === 'available').length;
+    return {
+      total: mergedTasks.length,
+      active,
+      pending,
+      completed,
+      delayed,
+      averageProgress,
+    };
+  }, [mergedTasks]);
 
-  const overallEfficiency = realLines.reduce((sum, line) => sum + line.efficiency, 0) / realLines.length;
-
-  const TaskCard = ({ task }: { task: ProductionTask }) => {
-    const stage = productionStages.find(s => s.id === task.stage);
-    const timeRemaining = task.estimatedCompletionTime 
-      ? Math.max(0, Math.floor((task.estimatedCompletionTime.getTime() - Date.now()) / (1000 * 60)))
-      : null;
+  const renderTaskCard = (task: EnrichedTask) => {
+    const stage = productionStages.find((item) => item.id === task.stage);
+    const hasIssues = Array.isArray(task.issues) && task.issues.length > 0;
 
     return (
-      <Card 
+      <Card
+        key={task.id}
         className={cn(
-          "bg-card border-border hover:bg-muted/5 transition-colors cursor-pointer",
-          selectedTask?.id === task.id && "ring-2 ring-biobox-green"
+          "cursor-pointer border-border bg-card transition-colors hover:bg-muted/5",
+          selectedTask?.id === task.id && "ring-2 ring-biobox-green",
         )}
         onClick={() => setSelectedTask(task)}
       >
-        <CardContent className="p-4">
-          <div className="flex items-start justify-between mb-3">
+        <CardContent className="space-y-3 p-4">
+          <div className="flex items-start justify-between">
             <div className="flex items-center space-x-2">
-              <div
-                className={cn("w-2 h-2 rounded-full", priorityColors[task.priority])}
-              />
-              <span className="font-medium text-sm">{task.orderNumber}</span>
+              <div className={cn("h-2 w-2 rounded-full", priorityColors[task.priority])} />
+              <span className="text-sm font-medium">{task.orderNumber}</span>
             </div>
-            <Badge 
-              variant="outline" 
-              className={cn("text-xs", statusColors[task.status])}
-            >
+            <Badge variant="outline" className={cn("text-xs", statusColors[task.status])}>
               {statusLabels[task.status]}
             </Badge>
           </div>
-          
-          <div className="space-y-2">
-            <div>
-              <p className="text-sm font-medium">{task.productName}</p>
-              <p className="text-xs text-muted-foreground">{task.customerName}</p>
-            </div>
-            
-            <div className="flex items-center text-xs text-muted-foreground">
-              <Package className="h-3 w-3 mr-1" />
-              <span>{stage?.name}</span>
-            </div>
-            
-            {task.assignedOperator && (
-              <div className="flex items-center text-xs text-muted-foreground">
-                <User className="h-3 w-3 mr-1" />
-                <span>{task.assignedOperator}</span>
-              </div>
-            )}
-            
-            <div className="space-y-1">
-              <div className="flex items-center justify-between text-xs">
-                <span>Progresso</span>
-                <span>{task.progress}%</span>
-              </div>
-              <Progress value={task.progress} className="h-2" />
-            </div>
-            
-            {timeRemaining !== null && task.status === 'in_progress' && (
-              <div className="flex items-center text-xs text-muted-foreground">
-                <Clock className="h-3 w-3 mr-1" />
-                <span>
-                  {timeRemaining > 0 
-                    ? `${timeRemaining} min restantes`
-                    : "Atrasado"
-                  }
-                </span>
-              </div>
-            )}
-            
-            {task.issues && task.issues.length > 0 && (
-              <div className="flex items-center text-xs text-red-500">
-                <AlertTriangle className="h-3 w-3 mr-1" />
-                <span>{task.issues.length} problema(s)</span>
-              </div>
-            )}
+
+          <div className="space-y-1">
+            <p className="text-sm font-medium">{task.productName}</p>
+            <p className="text-xs text-muted-foreground">{task.customerName}</p>
           </div>
+
+          <div className="flex items-center text-xs text-muted-foreground">
+            <Package className="mr-1 h-3 w-3" />
+            <span>{stage?.name ?? "Etapa de produção"}</span>
+          </div>
+
+          {task.assignedOperator && (
+            <div className="flex items-center text-xs text-muted-foreground">
+              <Avatar className="mr-2 h-5 w-5">
+                <AvatarFallback className="text-[10px]">
+                  {task.assignedOperator
+                    .split(" ")
+                    .map((item) => item[0])
+                    .join("")
+                    .toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+              <span>{task.assignedOperator}</span>
+            </div>
+          )}
+
+          <div className="space-y-1">
+            <div className="flex items-center justify-between text-xs">
+              <span>Progresso</span>
+              <span>{task.progress}%</span>
+            </div>
+            <Progress value={task.progress} className="h-2" />
+          </div>
+
+          {typeof task.dueInMinutes === "number" && task.status === "in_progress" && (
+            <div className="flex items-center text-xs text-muted-foreground">
+              <Clock className="mr-1 h-3 w-3" />
+              <span>
+                {task.dueInMinutes > 0
+                  ? `${task.dueInMinutes} min restantes`
+                  : "Atrasado"}
+              </span>
+            </div>
+          )}
+
+          {hasIssues && (
+            <div className="flex items-center text-xs text-red-500">
+              <AlertTriangle className="mr-1 h-3 w-3" />
+              <span>{task.issues!.length} problema(s)</span>
+            </div>
+          )}
         </CardContent>
       </Card>
     );
   };
 
-  const LineCard = ({ line }: { line: ProductionLine }) => (
-    <Card className="bg-card border-border">
-      <CardContent className="p-4">
-        <div className="flex items-start justify-between mb-3">
-          <div>
-            <h4 className="font-medium">{line.name}</h4>
-            {line.currentOrder && (
-              <p className="text-sm text-muted-foreground">
-                Pedido: {line.currentOrder}
-              </p>
-            )}
+  const renderTaskDetail = () => {
+    if (!selectedTask) {
+      return (
+        <Card className="border-border bg-card">
+          <CardContent className="flex h-full items-center justify-center p-10 text-center text-sm text-muted-foreground">
+            Selecione uma tarefa para ver os detalhes.
+          </CardContent>
+        </Card>
+      );
+    }
+
+    const stage = productionStages.find((item) => item.id === selectedTask.stage);
+    const startedAt = selectedTask.startTime
+      ? format(selectedTask.startTime, "dd 'de' MMMM yyyy, HH:mm", { locale: ptBR })
+      : "Não iniciado";
+    const dueAt = selectedTask.estimatedCompletionTime
+      ? format(selectedTask.estimatedCompletionTime, "dd 'de' MMMM yyyy, HH:mm", { locale: ptBR })
+      : "Não definido";
+
+    return (
+      <Card className="border-border bg-card">
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between text-lg">
+            <span>{selectedTask.orderNumber}</span>
+            <Badge variant="outline" className={cn("text-xs", statusColors[selectedTask.status])}>
+              {statusLabels[selectedTask.status]}
+            </Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <p className="text-xs text-muted-foreground">Cliente</p>
+              <p className="text-sm font-medium">{selectedTask.customerName}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Produto</p>
+              <p className="text-sm font-medium">{selectedTask.productName}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Etapa</p>
+              <p className="text-sm font-medium">{stage?.name ?? "Etapa de produção"}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Prioridade</p>
+              <Badge variant="outline" className={cn("text-xs", priorityColors[selectedTask.priority])}>
+                {selectedTask.priority === "low"
+                  ? "Baixa"
+                  : selectedTask.priority === "medium"
+                  ? "Média"
+                  : selectedTask.priority === "high"
+                  ? "Alta"
+                  : "Urgente"}
+              </Badge>
+            </div>
           </div>
-          <Badge 
-            variant="outline"
-            className={cn(
-              "text-xs",
-              line.status === 'active' 
-                ? "bg-biobox-green/10 text-biobox-green border-biobox-green/20"
-                : line.status === 'maintenance'
-                ? "bg-orange-500/10 text-orange-500 border-orange-500/20"
-                : "bg-red-500/10 text-red-500 border-red-500/20"
-            )}
-          >
-            {line.status === 'active' ? 'Ativa' : 
-             line.status === 'maintenance' ? 'Manutenção' : 'Inativa'}
-          </Badge>
-        </div>
-        
-        <div className="space-y-3">
-          {line.operatorName && (
-            <div className="flex items-center text-sm">
-              <User className="h-4 w-4 mr-2 text-muted-foreground" />
-              <span>{line.operatorName}</span>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <p className="text-xs text-muted-foreground">Início</p>
+              <p className="text-sm font-medium">{startedAt}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Previsão de término</p>
+              <p className="text-sm font-medium">{dueAt}</p>
+            </div>
+          </div>
+
+          <div>
+            <p className="text-xs text-muted-foreground mb-2">Progresso</p>
+            <Progress value={selectedTask.progress} className="h-2" />
+            <p className="mt-1 text-xs text-muted-foreground">
+              {selectedTask.progress}% concluído
+            </p>
+          </div>
+
+          {selectedTask.notes && (
+            <div>
+              <p className="text-xs text-muted-foreground">Observações</p>
+              <p className="text-sm text-muted-foreground">{selectedTask.notes}</p>
             </div>
           )}
-          
-          <div className="grid grid-cols-2 gap-3 text-sm">
-            <div>
-              <p className="text-muted-foreground">Eficiência</p>
-              <p className="font-medium">{line.efficiency}%</p>
-            </div>
-            <div>
-              <p className="text-muted-foreground">Produzido Hoje</p>
-              <p className="font-medium">{line.dailyProduced}/{line.dailyTarget}</p>
-            </div>
-          </div>
-          
-          <div className="space-y-1">
-            <div className="flex justify-between text-xs">
-              <span>Meta Diária</span>
-              <span>{Math.round((line.dailyProduced / line.dailyTarget) * 100)}%</span>
-            </div>
-            <Progress value={(line.dailyProduced / line.dailyTarget) * 100} className="h-2" />
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
 
-  const OperatorCard = ({ operator }: { operator: Operator }) => (
-    <Card className="bg-card border-border">
-      <CardContent className="p-4">
-        <div className="flex items-start justify-between mb-3">
-          <div className="flex items-center space-x-3">
-            <Avatar>
-              <AvatarFallback className="bg-biobox-green/10 text-biobox-green text-xs">
-                {operator.name.split(' ').map(n => n[0]).join('').toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
-            <div>
-              <h4 className="font-medium text-sm">{operator.name}</h4>
-              <p className="text-xs text-muted-foreground">
-                {operator.experience} anos de experiência
-              </p>
+          {selectedTask.issues && selectedTask.issues.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center space-x-2 text-sm font-medium text-red-500">
+                <AlertTriangle className="h-4 w-4" />
+                <span>Problemas registrados</span>
+              </div>
+              <ul className="space-y-2 text-xs text-red-500">
+                {selectedTask.issues.map((issue) => (
+                  <li key={issue.id} className="rounded border border-red-500/20 p-2">
+                    <p className="font-medium">{issue.type.toUpperCase()}</p>
+                    <p>{issue.description}</p>
+                  </li>
+                ))}
+              </ul>
             </div>
-          </div>
-          <Badge 
-            variant="outline"
-            className={cn("text-xs", operatorStatusColors[operator.status])}
-          >
-            {operatorStatusLabels[operator.status]}
-          </Badge>
-        </div>
-        
-        <div className="space-y-2">
-          <div className="flex justify-between text-xs">
-            <span>Eficiência</span>
-            <span>{operator.efficiency}%</span>
-          </div>
-          
-          <div className="flex flex-wrap gap-1">
-            {operator.skills.slice(0, 3).map(skill => (
-              <Badge key={skill} variant="secondary" className="text-xs">
-                {skill}
-              </Badge>
-            ))}
-            {operator.skills.length > 3 && (
-              <Badge variant="secondary" className="text-xs">
-                +{operator.skills.length - 3}
-              </Badge>
-            )}
-          </div>
-          
-          <div className="text-xs text-muted-foreground">
-            Turno: {operator.shift === 'morning' ? 'Manhã' : 
-                   operator.shift === 'afternoon' ? 'Tarde' : 'Noite'}
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
+          )}
+        </CardContent>
+      </Card>
+    );
+  };
 
   return (
     <div className="space-y-6">
-      {/* Statistics Cards */}
       <div className="grid gap-4 md:grid-cols-4">
-        <Card className="bg-card border-border">
-          <CardContent className="p-6">
-            <div className="flex items-center">
-              <Activity className="h-8 w-8 text-blue-500" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-muted-foreground">Tarefas Ativas</p>
-                <p className="text-2xl font-bold text-foreground">{activeTasks}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-card border-border">
-          <CardContent className="p-6">
-            <div className="flex items-center">
-              <CheckCircle className="h-8 w-8 text-biobox-green" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-muted-foreground">Concluídas Hoje</p>
-                <p className="text-2xl font-bold text-foreground">{completedToday}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-card border-border">
-          <CardContent className="p-6">
-            <div className="flex items-center">
-              <AlertTriangle className="h-8 w-8 text-red-500" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-muted-foreground">Bloqueadas</p>
-                <p className="text-2xl font-bold text-foreground">{blockedTasks}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-card border-border">
+        <Card className="border-border bg-card">
           <CardContent className="p-6">
             <div className="flex items-center">
               <TrendingUp className="h-8 w-8 text-green-500" />
               <div className="ml-4">
-                <p className="text-sm font-medium text-muted-foreground">Eficiência Geral</p>
-                <p className="text-2xl font-bold text-foreground">{Math.round(overallEfficiency)}%</p>
+                <p className="text-sm font-medium text-muted-foreground">Tarefas em andamento</p>
+                <p className="text-2xl font-bold text-foreground">{taskStats.active}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-border bg-card">
+          <CardContent className="p-6">
+            <div className="flex items-center">
+              <Clock className="h-8 w-8 text-orange-500" />
+              <div className="ml-4">
+                <p className="text-sm font-medium text-muted-foreground">Tarefas pendentes</p>
+                <p className="text-2xl font-bold text-foreground">{taskStats.pending}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-border bg-card">
+          <CardContent className="p-6">
+            <div className="flex items-center">
+              <CheckCircle className="h-8 w-8 text-biobox-green" />
+              <div className="ml-4">
+                <p className="text-sm font-medium text-muted-foreground">Concluídas</p>
+                <p className="text-2xl font-bold text-foreground">{taskStats.completed}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-border bg-card">
+          <CardContent className="p-6">
+            <div className="flex items-center">
+              <AlertTriangle className="h-8 w-8 text-red-500" />
+              <div className="ml-4">
+                <p className="text-sm font-medium text-muted-foreground">Atrasadas</p>
+                <p className="text-2xl font-bold text-foreground">{taskStats.delayed}</p>
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Main Content */}
-      <Tabs defaultValue="tasks" className="space-y-6">
-        <TabsList>
-          <TabsTrigger value="tasks">Tarefas em Andamento</TabsTrigger>
-          <TabsTrigger value="lines">Linhas de Produção</TabsTrigger>
-          <TabsTrigger value="operators">Operadores</TabsTrigger>
-        </TabsList>
+      <Card className="border-border bg-card">
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            <span>Fila de produção</span>
+            <Badge variant="outline" className="text-xs">
+              {taskStats.total} tarefa{taskStats.total !== 1 ? "s" : ""}
+            </Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Tabs defaultValue="active" className="space-y-4">
+            <TabsList>
+              <TabsTrigger value="active">Em andamento</TabsTrigger>
+              <TabsTrigger value="pending">Pendentes</TabsTrigger>
+              <TabsTrigger value="completed">Concluídas</TabsTrigger>
+            </TabsList>
 
-        <TabsContent value="tasks">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {realTasks
-              .filter(task => task.status !== 'completed')
-              .map(task => (
-                <TaskCard key={task.id} task={task} />
-              ))}
-          </div>
-        </TabsContent>
-
-        <TabsContent value="lines">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {realLines.map(line => (
-              <LineCard key={line.id} line={line} />
-            ))}
-          </div>
-        </TabsContent>
-
-        <TabsContent value="operators">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {realOperators.map(operator => (
-              <OperatorCard key={operator.id} operator={operator} />
-            ))}
-          </div>
-        </TabsContent>
-      </Tabs>
-
-      {/* Task Detail Modal */}
-      {selectedTask && (
-        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <Card className="w-full max-w-2xl bg-card border-border">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center space-x-2">
-                  <Package className="h-5 w-5" />
-                  <span>Detalhes da Tarefa</span>
-                </CardTitle>
-                <Button variant="ghost" size="icon" onClick={() => setSelectedTask(null)}>
-                  <Square className="h-4 w-4" />
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Pedido</p>
-                  <p className="font-medium">{selectedTask.orderNumber}</p>
+            <TabsContent value="active">
+              {mergedTasks.filter((task) => task.status === "in_progress").length === 0 ? (
+                <div className="rounded border border-dashed border-border p-10 text-center text-sm text-muted-foreground">
+                  Nenhuma tarefa em progresso.
                 </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Cliente</p>
-                  <p className="font-medium">{selectedTask.customerName}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Produto</p>
-                  <p className="font-medium">{selectedTask.productName}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Etapa</p>
-                  <p className="font-medium">
-                    {productionStages.find(s => s.id === selectedTask.stage)?.name}
-                  </p>
-                </div>
-              </div>
-              
-              {selectedTask.notes && (
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground mb-1">Observações</p>
-                  <p className="text-sm bg-muted/5 p-3 rounded-lg">{selectedTask.notes}</p>
+              ) : (
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  {mergedTasks
+                    .filter((task) => task.status === "in_progress")
+                    .map(renderTaskCard)}
                 </div>
               )}
-              
-              {selectedTask.issues && selectedTask.issues.length > 0 && (
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground mb-2">Problemas</p>
-                  <div className="space-y-2">
-                    {selectedTask.issues.map(issue => (
-                      <div key={issue.id} className="p-3 border border-red-200 rounded-lg">
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-sm font-medium text-red-600">
-                            {issue.type.charAt(0).toUpperCase() + issue.type.slice(1)}
-                          </span>
-                          <Badge variant="outline" className="text-xs text-red-500">
-                            {issue.status}
-                          </Badge>
-                        </div>
-                        <p className="text-sm">{issue.description}</p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Reportado por {issue.reportedBy} em {format(issue.reportedAt, "dd/MM HH:mm")}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
+            </TabsContent>
+
+            <TabsContent value="pending">
+              {mergedTasks.filter((task) => task.status === "pending").length === 0 ? (
+                <div className="rounded border border-dashed border-border p-10 text-center text-sm text-muted-foreground">
+                  Nenhuma tarefa pendente.
+                </div>
+              ) : (
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  {mergedTasks
+                    .filter((task) => task.status === "pending")
+                    .map(renderTaskCard)}
                 </div>
               )}
-            </CardContent>
-          </Card>
-        </div>
-      )}
+            </TabsContent>
+
+            <TabsContent value="completed">
+              {mergedTasks.filter((task) => task.status === "completed").length === 0 ? (
+                <div className="rounded border border-dashed border-border p-10 text-center text-sm text-muted-foreground">
+                  Nenhuma tarefa concluída.
+                </div>
+              ) : (
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  {mergedTasks
+                    .filter((task) => task.status === "completed")
+                    .map(renderTaskCard)}
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
+
+      <Card className="border-border bg-card">
+        <CardHeader>
+          <CardTitle>Detalhes da tarefa selecionada</CardTitle>
+        </CardHeader>
+        <CardContent>{renderTaskDetail()}</CardContent>
+      </Card>
     </div>
   );
 }
