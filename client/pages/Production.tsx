@@ -49,18 +49,27 @@ export default function Production() {
 
         <Dialog open={showReport} onOpenChange={setShowReport}>
           <DialogContent className="max-w-5xl">
+            <DialogHeader>
+              <DialogTitle className="sr-only">Relatório de Produção</DialogTitle>
+            </DialogHeader>
             <ProductionReport onClose={() => setShowReport(false)} />
           </DialogContent>
         </Dialog>
 
         <Dialog open={showPrint} onOpenChange={setShowPrint}>
           <DialogContent className="max-w-4xl">
+            <DialogHeader>
+              <DialogTitle className="sr-only">Etiquetas</DialogTitle>
+            </DialogHeader>
             <ThermalPrintManager />
           </DialogContent>
         </Dialog>
 
         <Dialog open={showNewTask} onOpenChange={setShowNewTask}>
           <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle className="sr-only">Nova Tarefa de Produção</DialogTitle>
+            </DialogHeader>
             <NewProductionTask
               onClose={() => setShowNewTask(false)}
               onSaved={() => setRefreshToken((value) => value + 1)}
