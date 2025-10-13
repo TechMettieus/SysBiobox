@@ -201,9 +201,6 @@ export default function Products() {
       product.sku.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
-  const filteredMaterials = rawMaterials.filter((material) =>
-    material.name.toLowerCase().includes(searchTerm.toLowerCase()),
-  );
 
   // Statistics
   const totalProducts = products.length;
@@ -491,7 +488,6 @@ export default function Products() {
           <div className="flex items-center justify-between">
             <TabsList>
               <TabsTrigger value="products">Catálogo de Produtos</TabsTrigger>
-              <TabsTrigger value="materials">Matéria Prima</TabsTrigger>
               <TabsTrigger value="barcode">Códigos de Barra</TabsTrigger>
             </TabsList>
 
@@ -538,13 +534,6 @@ export default function Products() {
             )}
           </TabsContent>
 
-          <TabsContent value="materials">
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {filteredMaterials.map((material) => (
-                <MaterialCard key={material.id} material={material} />
-              ))}
-            </div>
-          </TabsContent>
 
           <TabsContent value="barcode">
             <div className="space-x-2">
