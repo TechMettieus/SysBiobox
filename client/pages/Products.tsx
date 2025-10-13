@@ -15,7 +15,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import ProductForm, { ProductFormValues } from "@/components/ProductForm";
 import BarcodeGenerator from "@/components/BarcodeGenerator";
 import ThermalPrintManager from "@/components/ThermalPrintManager";
