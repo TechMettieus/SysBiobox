@@ -203,16 +203,27 @@ export default function UserManagement() {
         let userId: string;
         let createdInAuth = false;
 
-        // Criar no Firebase Auth se disponível
-        if (isFirebaseConfigured && auth) {
+        // Criar no Firebase Auth em um app secundário para não afetar a sessão atual
+        if (isFirebaseConfigured) {
           try {
+            const { initializeApp, deleteApp } = await import("firebase/app");
+            const secondary = initializeApp((app as any).options, `auth-create-${Date.now()}`);
+            const secondaryAuth = getAuth(secondary);
+
             const userCredential = await createUserWithEmailAndPassword(
-              auth,
+              secondaryAuth,
               formData.email.trim().toLowerCase(),
               formData.password
             );
             userId = userCredential.user.uid;
             createdInAuth = true;
+
+            try {
+              await updateProfile(userCredential.user, { displayName: formData.name.trim() });
+            } catch {}
+
+            await signOut(secondaryAuth);
+            await deleteApp(secondary);
 
             toast({
               title: "Conta criada no Firebase Auth",
@@ -220,8 +231,7 @@ export default function UserManagement() {
             });
           } catch (error: any) {
             console.error("Erro no Firebase Auth:", error);
-            
-            // Se o erro for email já existente, informar
+
             if (error.code === 'auth/email-already-in-use') {
               toast({
                 title: "Email já cadastrado",
@@ -230,8 +240,7 @@ export default function UserManagement() {
               });
               return;
             }
-            
-            // Para outros erros, continuar sem auth (fallback)
+
             userId = `user-${Date.now()}`;
             toast({
               title: "Aviso",
