@@ -150,7 +150,8 @@ const mapOrderToTask = (order: Order): ProductionTask => {
     id: `task-${order.id}`,
     orderId: order.id,
     orderNumber: order.order_number,
-    productName: order.products?.[0]?.product_name || "Pedido";
+    productName:
+      order.products?.[0]?.product_name || order.products?.[0]?.productName || "Pedido",
     customerId: order.customer_id,
     customerName: order.customer_name || "Cliente",
     stage: stage?.id || "design",
@@ -158,7 +159,7 @@ const mapOrderToTask = (order: Order): ProductionTask => {
     status: orderStatusToTaskStage(status),
     priority: (order.priority || "medium") as ProductionTask["priority"],
     assignedOperator: order.assigned_operator || undefined,
-    startTime: parseDate(order.started_at) || parseDate(order.updated_at),
+    startTime: parseDate((order as any).started_at) || parseDate(order.updated_at),
     estimatedCompletionTime: parseDate(order.delivery_date),
     actualCompletionTime: parseDate(order.completed_date),
     progress: computeProgress(order),
