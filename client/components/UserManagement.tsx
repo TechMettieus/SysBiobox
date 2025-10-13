@@ -13,7 +13,7 @@ import { User as UserType, mockUsers, defaultPermissions } from "@/types/user";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useSupabase } from "@/hooks/useSupabase";
-import { db, isFirebaseConfigured, auth } from "@/lib/firebase";
+import { db, isFirebaseConfigured, auth, app } from "@/lib/firebase";
 import { addDoc, collection, serverTimestamp, updateDoc, doc } from "firebase/firestore";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { sanitizeForFirestore } from "@/lib/firestore";
