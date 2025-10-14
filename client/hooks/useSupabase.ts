@@ -377,6 +377,36 @@ export function useSupabase() {
           description: `Pedido ${saved.order_number} criado por ${user?.name}`,
           metadata: { seller_id: saved.seller_id },
         });
+        const ref = await addDoc(
+          collection(db, "orders"),
+          sanitizeForFirestore({
+            ...dataToSave,
+            created_at: serverTimestamp(),
+            updated_at: serverTimestamp(),
+          }),
+        );
+        const saved: Order = {
+          ...dataToSave,
+          id: ref.id,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        } as Order;
+        // notify other components that orders changed
+        try {
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(new CustomEvent("orders:changed", { detail: { id: saved.id } }));
+          }
+        } catch {}
+        await logActivity({
+          userId: user?.id,
+          userName: user?.name || "",
+          actionType: "create",
+          entityType: "order",
+          entityId: saved.id,
+          entityName: saved.order_number,
+          description: `Pedido ${saved.order_number} criado por ${user?.name}`,
+          metadata: { seller_id: saved.seller_id },
+        });
         return saved;
       } catch (err) {
         console.warn(
@@ -394,6 +424,11 @@ export function useSupabase() {
       updated_at: new Date().toISOString(),
     } as Order;
     localStorage.setItem("biobox_orders", JSON.stringify([saved, ...orders]));
+    try {
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("orders:changed", { detail: { id: saved.id } }));
+      }
+    } catch {}
     await logActivity({
       userId: user?.id,
       userName: user?.name || "",
