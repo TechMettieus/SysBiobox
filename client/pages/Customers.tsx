@@ -248,7 +248,7 @@ export default function Customers() {
             await loadCustomers(); // Recarregar dados
           }
         } catch (err) {
-          console.error("��� Erro ao criar cliente:", err);
+          console.error("❌ Erro ao criar cliente:", err);
           const newCustomer: Customer = {
             ...customerData,
             id: Date.now().toString(),
@@ -468,7 +468,7 @@ export default function Customers() {
                     placeholder="Buscar clientes..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10 w-64"
+                    className="pl-10 w-full sm:w-64"
                   />
                 </div>
                 <div className="flex items-center space-x-2">
