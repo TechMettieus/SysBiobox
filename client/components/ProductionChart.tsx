@@ -11,7 +11,7 @@ import {
   AreaChart,
   Line,
 } from "recharts";
-import { useSupabase } from "@/hooks/useSupabase";
+import { useFirebase } from "@/hooks/useFirebase";
 import { Package } from "lucide-react";
 
 interface ProductionData {
@@ -23,7 +23,7 @@ interface ProductionData {
 export default function ProductionChart() {
   const [loading, setLoading] = useState(true);
   const [productionData, setProductionData] = useState<ProductionData[]>([]);
-  const { getOrders, isConnected } = useSupabase();
+  const { getOrders, isConnected } = useFirebase();
 
   useEffect(() => {
     loadProductionData();
