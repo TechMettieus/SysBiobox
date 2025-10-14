@@ -77,22 +77,49 @@ export default function UserManagement() {
     try {
       setLoading(true);
       const usersData = await fetchUsers();
+      const parseDate = (val: any) => {
+        if (!val) return undefined;
+        if (val instanceof Date) return val;
+        if (typeof val === "string") {
+          const d = new Date(val);
+          return Number.isNaN(d.getTime()) ? undefined : d;
+        }
+        if (typeof val?.toDate === "function") {
+          try {
+            return val.toDate();
+          } catch {
+            return undefined;
+          }
+        }
+        try {
+          const d = new Date(val);
+          return Number.isNaN(d.getTime()) ? undefined : d;
+        } catch {
+          return undefined;
+        }
+      };
+
       const formattedUsers: UserType[] = usersData.map((u) => ({
         id: u.id,
         name: u.name,
         email: u.email,
-        role: u.role as "admin" | "seller",
-        status: "active",
-        permissions: (u.permissions || []).map((permId) => {
+        role: (u.role || "seller") as "admin" | "seller",
+        status: u.status || "active",
+        permissions: (u.permissions || []).map((permId: any) => {
           const perm = defaultPermissions.find((p) => p.id === permId);
           return (
             perm ||
             ({ id: permId, name: permId, module: "system", actions: [] } as any)
           );
         }),
-        createdAt: new Date(u.created_at),
-        updatedAt: new Date(u.updated_at),
-        createdBy: "system",
+        createdAt:
+          parseDate(u.created_at) || parseDate(u.createdAt) || new Date(),
+        updatedAt:
+          parseDate(u.updated_at) ||
+          parseDate(u.updatedAt) ||
+          parseDate(u.created_at) ||
+          new Date(),
+        createdBy: u.createdBy || "system",
       }));
       setUsers(formattedUsers.length > 0 ? formattedUsers : mockUsers);
     } catch (e) {
@@ -248,53 +275,99 @@ export default function UserManagement() {
 
         // Criar no Firebase Auth em um app secundário para não afetar a sessão atual
         if (isFirebaseConfigured) {
-          try {
-            const { initializeApp, deleteApp } = await import("firebase/app");
-            const secondary = initializeApp(
-              (app as any).options,
-              `auth-create-${Date.now()}`,
-            );
-            const secondaryAuth = getAuth(secondary);
-
-            const userCredential = await createUserWithEmailAndPassword(
-              secondaryAuth,
-              formData.email.trim().toLowerCase(),
-              formData.password,
-            );
-            userId = userCredential.user.uid;
-            createdInAuth = true;
-
-            try {
-              await updateProfile(userCredential.user, {
-                displayName: formData.name.trim(),
-              });
-            } catch {}
-
-            await signOut(secondaryAuth);
-            await deleteApp(secondary);
-
-            toast({
-              title: "Conta criada no Firebase Auth",
-              description: "Usuário autenticado criado com sucesso",
-            });
-          } catch (error: any) {
-            console.error("Erro no Firebase Auth:", error);
-
-            if (error.code === "auth/email-already-in-use") {
-              toast({
-                title: "Email já cadastrado",
-                description: "Este email já está sendo usado por outro usuário",
-                variant: "destructive",
-              });
-              return;
-            }
-
+          // If offline, skip Firebase Auth to avoid network errors
+          if (typeof window !== "undefined" && !navigator.onLine) {
+            console.warn("Offline: skipping Firebase Auth user creation");
             userId = `user-${Date.now()}`;
             toast({
-              title: "Aviso",
-              description: "Usuário criado sem autenticação Firebase",
+              title: "Sem conexão",
+              description:
+                "Sem conexão com a internet. Usuário criado sem autenticação Firebase",
               variant: "destructive",
             });
+          } else {
+            let secondary: any = null;
+            let secondaryAuth: any = null;
+            let deleteAppFn: any = null;
+            try {
+              const mod = await import("firebase/app");
+              const initializeFirebaseApp = mod.initializeApp;
+              deleteAppFn = mod.deleteApp;
+
+              secondary = initializeFirebaseApp(
+                (app as any).options,
+                `auth-create-${Date.now()}`,
+              );
+              secondaryAuth = getAuth(secondary);
+
+              const userCredential = await createUserWithEmailAndPassword(
+                secondaryAuth,
+                formData.email.trim().toLowerCase(),
+                formData.password,
+              );
+              userId = userCredential.user.uid;
+              createdInAuth = true;
+
+              try {
+                await updateProfile(userCredential.user, {
+                  displayName: formData.name.trim(),
+                });
+              } catch {}
+
+              toast({
+                title: "Conta criada no Firebase Auth",
+                description: "Usuário autenticado criado com sucesso",
+              });
+            } catch (error: any) {
+              // Log non-sensitive info, but avoid noisy stack for network errors
+              if (error?.code === "auth/network-request-failed") {
+                console.warn(
+                  "Firebase network error while creating user (fallback):",
+                  error.message,
+                );
+                userId = `user-${Date.now()}`;
+                toast({
+                  title: "Erro de rede no Firebase",
+                  description:
+                    "Não foi possível conectar ao Firebase. Usuário criado sem autenticação Firebase",
+                  variant: "destructive",
+                });
+              } else if (error?.code === "auth/email-already-in-use") {
+                toast({
+                  title: "Email já cadastrado",
+                  description:
+                    "Este email já está sendo usado por outro usuário",
+                  variant: "destructive",
+                });
+                // ensure cleanup of secondary app below
+                // and exit to prevent creating duplicate local user
+                try {
+                  if (secondaryAuth) await signOut(secondaryAuth);
+                } catch {}
+                try {
+                  if (secondary && deleteAppFn) await deleteAppFn(secondary);
+                } catch {}
+                return;
+              } else {
+                console.warn(
+                  "Firebase Auth error, falling back:",
+                  error?.message || error,
+                );
+                userId = `user-${Date.now()}`;
+                toast({
+                  title: "Aviso",
+                  description: "Usuário criado sem autenticação Firebase",
+                  variant: "destructive",
+                });
+              }
+            } finally {
+              try {
+                if (secondaryAuth) await signOut(secondaryAuth);
+              } catch {}
+              try {
+                if (secondary && deleteAppFn) await deleteAppFn(secondary);
+              } catch (e) {}
+            }
           }
         } else {
           userId = `user-${Date.now()}`;
@@ -457,8 +530,12 @@ export default function UserManagement() {
     }));
   };
 
-  const formatDate = (date: Date) =>
-    new Intl.DateTimeFormat("pt-BR").format(date);
+  const formatDate = (date?: Date | string | number | null) => {
+    if (!date) return "—";
+    const d = date instanceof Date ? date : new Date(date);
+    if (isNaN(d.getTime())) return "—";
+    return new Intl.DateTimeFormat("pt-BR").format(d);
+  };
 
   return (
     <div className="space-y-6">
