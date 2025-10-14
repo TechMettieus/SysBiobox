@@ -457,8 +457,12 @@ export default function UserManagement() {
     }));
   };
 
-  const formatDate = (date: Date) =>
-    new Intl.DateTimeFormat("pt-BR").format(date);
+  const formatDate = (date?: Date | string | number | null) => {
+    if (!date) return "—";
+    const d = date instanceof Date ? date : new Date(date);
+    if (isNaN(d.getTime())) return "—";
+    return new Intl.DateTimeFormat("pt-BR").format(d);
+  };
 
   return (
     <div className="space-y-6">
