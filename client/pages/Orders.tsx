@@ -609,6 +609,9 @@ export default function OrdersSupabase() {
   ) => {
     const updates: Partial<Order> = { status: nextStatus };
     if (typeof progress === "number") updates.production_progress = progress;
+    if (nextStatus === "delivered") {
+      (updates as any).completed_date = new Date().toISOString();
+    }
     const updated = await updateOrder(order.id, updates);
     if (updated) {
       applyUpdate(updated);
@@ -1349,7 +1352,7 @@ export default function OrdersSupabase() {
                       }}
                     >
                       <Scissors className="h-4 w-4 mr-2" />
-                      Fragmentar Produção
+                      Fragmentar Produç��o
                     </Button>
                   )}
 
