@@ -328,6 +328,8 @@ export function useSupabase() {
           return {
             ...dataWithoutId,
             id: d.id,
+            status: normalizeStatus(data.status ?? dataWithoutId.status),
+            priority: data.priority ?? dataWithoutId.priority,
             created_at: created.toISOString(),
             updated_at: updated.toISOString(),
           } as Order;
