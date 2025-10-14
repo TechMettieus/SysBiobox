@@ -7,6 +7,7 @@ import { Toaster } from "sonner"
 import AuthProvider from "@/components/AuthProvider"
 
 import App from "./App"
+import "./lib/resizeObserverFix";
 import "./global.css" // estilos globais
 
 // Cliente do React Query
