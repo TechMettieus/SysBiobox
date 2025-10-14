@@ -57,10 +57,10 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import {
-  useSupabase,
+  useFirebase,
   Order,
   OrderFragment as DbOrderFragment,
-} from "@/hooks/useSupabase";
+} from "@/hooks/useFirebase";
 import { useToast } from "@/components/ui/use-toast";
 import { useNavigate } from "react-router-dom";
 import { OrderFragment as UiOrderFragment } from "@/types/order";
@@ -178,7 +178,7 @@ const QuickStatusChange = ({
   );
 };
 
-export default function OrdersSupabase() {
+export default function Orders() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -197,12 +197,12 @@ export default function OrdersSupabase() {
   const [currentPage, setCurrentPage] = useState(1);
 
   const { checkPermission } = useAuth();
-  const supabaseHook = useSupabase();
-  const { getOrders, createOrder, updateOrder, isConnected } = supabaseHook;
+  const firebaseHook = useFirebase();
+  const { getOrders, createOrder, updateOrder, isConnected } = firebaseHook;
 
   // Verificar se deleteOrder existe, senão usar uma implementação local
   const deleteOrderFn =
-    supabaseHook.deleteOrder ||
+    firebaseHook.deleteOrder ||
     (async (orderId: string) => {
       console.log(
         "⚠️ deleteOrder não existe no hook, usando implementação local",
@@ -400,7 +400,7 @@ export default function OrdersSupabase() {
 
   useEffect(() => {
     if (isConnected && orders.length === 0 && !loading) {
-      console.log("🔄 Reconectado ao Supabase, recarregando pedidos...");
+      console.log("🔄 Reconectado ao Firebase, recarregando pedidos...");
       loadOrders();
     }
   }, [isConnected]);
@@ -534,7 +534,7 @@ export default function OrdersSupabase() {
 
       console.log("🗑️ Excluindo pedido:", orderId);
 
-      // Usar deleteOrderFn que vem do useSupabase
+      // Usar deleteOrderFn que vem do useFirebase
       const success = await deleteOrderFn(orderId);
 
       if (!success) {
