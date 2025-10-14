@@ -18,11 +18,11 @@ import {
   statusLabels,
   priorityColors,
 } from "@/types/production";
-import { Order } from "@/hooks/useSupabase";
+import { Order } from "@/hooks/useFirebase";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { useSupabase } from "@/hooks/useSupabase";
+import { useFirebase } from "@/hooks/useFirebase";
 import { useLocation, useSearchParams } from "react-router-dom";
 
 interface ProductionDashboardProps {
@@ -239,7 +239,7 @@ export default function ProductionDashboard({
   tasks,
   refreshToken,
 }: ProductionDashboardProps) {
-  const { getOrders } = useSupabase();
+  const { getOrders } = useFirebase();
   const [orders, setOrders] = useState<Order[]>([]);
   const [storedTasks, setStoredTasks] = useState<StoredTask[]>([]);
   const [loading, setLoading] = useState(true);
