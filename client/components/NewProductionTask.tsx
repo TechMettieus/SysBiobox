@@ -67,7 +67,7 @@ export default function NewProductionTask({
   return (
     <Card className="bg-card border-border">
       <CardContent className="space-y-4 p-4">
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <Label>Pedido</Label>
             <Select
@@ -118,7 +118,7 @@ export default function NewProductionTask({
             placeholder="Ex: Corte de MDF"
           />
         </div>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <Label>Operador (opcional)</Label>
             <Input
