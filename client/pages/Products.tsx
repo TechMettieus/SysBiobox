@@ -399,7 +399,7 @@ export default function Products() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl font-bold text-foreground">
               Produtos e Estoque
@@ -408,7 +408,7 @@ export default function Products() {
               Gerencie produtos, estoque e códigos de barras
             </p>
           </div>
-          <div className="flex space-x-2">
+          <div className="flex flex-wrap gap-2 sm:justify-end">
             <Button variant="outline" onClick={() => setShowBarcode(true)}>
               <QrCode className="h-4 w-4 mr-2" />
               Gerar Etiquetas
@@ -432,7 +432,7 @@ export default function Products() {
         </div>
 
         {/* Statistics Cards */}
-        <div className="grid gap-4 md:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Card className="bg-card border-border">
             <CardContent className="p-6">
               <div className="flex items-center">
@@ -497,19 +497,19 @@ export default function Products() {
 
         {/* Tabs */}
         <Tabs defaultValue="products" className="space-y-6">
-          <div className="flex items-center justify-between">
-            <TabsList>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <TabsList className="w-full overflow-x-auto whitespace-nowrap">
               <TabsTrigger value="products">Catálogo de Produtos</TabsTrigger>
               <TabsTrigger value="barcode">Códigos de Barra</TabsTrigger>
             </TabsList>
 
-            <div className="relative">
+            <div className="relative w-full sm:w-auto">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 placeholder="Buscar produtos..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 w-64"
+                className="pl-10 w-full sm:w-64"
               />
             </div>
           </div>
@@ -538,7 +538,7 @@ export default function Products() {
                 </CardContent>
               </Card>
             ) : (
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {filteredProducts.map((product) => (
                   <ProductCard key={product.id} product={product} />
                 ))}
@@ -547,7 +547,7 @@ export default function Products() {
           </TabsContent>
 
           <TabsContent value="barcode">
-            <div className="space-x-2">
+            <div className="flex flex-wrap gap-2">
               <Button
                 className="bg-biobox-green hover:bg-biobox-green-dark"
                 onClick={() => setShowBarcode(true)}
@@ -564,7 +564,7 @@ export default function Products() {
         {/* Product Detail Modal */}
         {selectedProduct && !showProductForm && (
           <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <Card className="w-full max-w-3xl max-h-[90vh] overflow-y-auto bg-card border-border">
+            <Card className="w-full max-w-[min(100%,40rem)] md:max-w-3xl max-h-[90vh] overflow-y-auto bg-card border-border">
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <CardTitle className="flex items-center space-x-2">
@@ -581,7 +581,7 @@ export default function Products() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">
                       Nome
@@ -621,7 +621,7 @@ export default function Products() {
                   </p>
                 </div>
 
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">
                       Preço Base
@@ -662,7 +662,7 @@ export default function Products() {
                               {model.isActive ? "Ativo" : "Inativo"}
                             </Badge>
                           </div>
-                          <div className="grid grid-cols-3 gap-3 text-sm">
+                          <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-3">
                             <div>
                               <p className="text-muted-foreground">Estoque</p>
                               <p className="font-medium">
@@ -742,7 +742,7 @@ export default function Products() {
 
         {/* Dialogs */}
         <Dialog open={showProductForm} onOpenChange={setShowProductForm}>
-          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="w-full max-w-[min(100%,40rem)] md:max-w-3xl max-h-[90vh] overflow-y-auto">
             <ProductForm
               product={selectedProduct}
               onSave={handleCreateProduct}
@@ -756,7 +756,7 @@ export default function Products() {
         </Dialog>
 
         <Dialog open={showBarcode} onOpenChange={setShowBarcode}>
-          <DialogContent className="max-w-3xl">
+          <DialogContent className="w-full max-w-[min(100%,40rem)] md:max-w-3xl">
             <DialogHeader>
               <DialogTitle className="sr-only">
                 Gerar Códigos de Barra
@@ -767,7 +767,7 @@ export default function Products() {
         </Dialog>
 
         <Dialog open={showLabels} onOpenChange={setShowLabels}>
-          <DialogContent className="max-w-3xl">
+          <DialogContent className="w-full max-w-[min(100%,40rem)] md:max-w-3xl">
             <DialogHeader>
               <DialogTitle className="sr-only">Imprimir Etiquetas</DialogTitle>
             </DialogHeader>

@@ -810,7 +810,7 @@ export default function ProductionDashboard({
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="active" className="space-y-4">
-            <TabsList>
+            <TabsList className="w-full overflow-x-auto whitespace-nowrap">
               <TabsTrigger value="active">Em andamento</TabsTrigger>
               <TabsTrigger value="pending">Pendentes</TabsTrigger>
               <TabsTrigger value="completed">Concluídas</TabsTrigger>

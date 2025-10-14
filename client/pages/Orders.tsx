@@ -848,7 +848,7 @@ export default function Orders() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
           <Card className="bg-card border-border">
             <CardContent className="p-6">
               <div className="flex items-center">
@@ -931,7 +931,7 @@ export default function Orders() {
         </div>
 
         {/* Filters */}
-        <div className="flex flex-col sm:flex-row gap-4">
+        <div className="flex flex-col sm:flex-row sm:flex-wrap gap-4">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -946,7 +946,7 @@ export default function Orders() {
             value={statusFilter}
             onValueChange={(value: any) => setStatusFilter(value)}
           >
-            <SelectTrigger className="w-48">
+            <SelectTrigger className="w-full sm:w-48">
               <SelectValue placeholder="Todos os Status" />
             </SelectTrigger>
             <SelectContent>
@@ -965,7 +965,7 @@ export default function Orders() {
             value={priorityFilter}
             onValueChange={(value: any) => setPriorityFilter(value)}
           >
-            <SelectTrigger className="w-48">
+            <SelectTrigger className="w-full sm:w-48">
               <SelectValue placeholder="Todas as Prioridades" />
             </SelectTrigger>
             <SelectContent>
@@ -1009,7 +1009,7 @@ export default function Orders() {
           </CardHeader>
           <CardContent>
             <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="grid w-full grid-cols-6">
+              <TabsList className="w-full overflow-x-auto whitespace-nowrap md:grid md:grid-cols-6">
                 <TabsTrigger value="all">
                   Todos ({stats.totalOrders})
                 </TabsTrigger>
@@ -1316,7 +1316,7 @@ export default function Orders() {
 
         {/* Order Details Dialog */}
         <Dialog open={showOrderDetails} onOpenChange={setShowOrderDetails}>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="w-full max-w-[min(100%,48rem)] md:max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>
                 Detalhes do Pedido {selectedOrder?.order_number}
@@ -1328,7 +1328,7 @@ export default function Orders() {
             {selectedOrder && (
               <div className="space-y-6">
                 {/* Cabeçalho com Status e Ações Rápidas */}
-                <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-4 bg-muted/50 rounded-lg">
                   <div className="flex items-center gap-4">
                     <Badge className={statusColors[selectedOrder.status]}>
                       {statusLabels[selectedOrder.status]}
@@ -1350,7 +1350,7 @@ export default function Orders() {
                 </div>
 
                 {/* Informações do Cliente e Pedido */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <Card>
                     <CardHeader>
                       <CardTitle className="text-base">
@@ -1448,7 +1448,7 @@ export default function Orders() {
                     <CardTitle className="text-base">Cronograma</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="grid grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                       <div>
                         <p className="text-sm text-muted-foreground mb-1">
                           Criado em
@@ -1554,7 +1554,7 @@ export default function Orders() {
                                   {fragmentStatusLabels[fragment.status]}
                                 </Badge>
                               </div>
-                              <div className="grid grid-cols-2 gap-2 text-sm text-muted-foreground">
+                              <div className="grid grid-cols-1 gap-2 text-sm text-muted-foreground sm:grid-cols-2">
                                 <span>
                                   Produção:{" "}
                                   {formatDate(fragment.scheduled_date as any)}
@@ -1595,7 +1595,7 @@ export default function Orders() {
                 )}
 
                 {/* Resumo Financeiro */}
-                <div className="flex justify-between items-center p-4 bg-biobox-green/10 border border-biobox-green/20 rounded-lg">
+                <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center p-4 bg-biobox-green/10 border border-biobox-green/20 rounded-lg">
                   <div>
                     <p className="text-sm text-muted-foreground">
                       Total do Pedido
@@ -1670,7 +1670,7 @@ export default function Orders() {
 
         {/* Edit Order Dialog */}
         <Dialog open={showEditForm} onOpenChange={setShowEditForm}>
-          <DialogContent className="max-w-5xl max-h-[95vh] overflow-hidden">
+          <DialogContent className="w-full max-w-[min(100%,56rem)] md:max-w-5xl max-h-[95vh] overflow-hidden">
             {editingOrder && (
               <OrderEditForm
                 order={editingOrder}

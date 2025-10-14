@@ -368,7 +368,7 @@ export default function Customers() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl font-bold text-foreground">
               Gerenciamento de Clientes
@@ -391,7 +391,7 @@ export default function Customers() {
         </div>
 
         {/* Stats e Filtros ... (código existente) */}
-        <div className="grid gap-4 md:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Card className="bg-card border-border">
             <CardContent className="p-6">
               <div className="flex items-center">
@@ -456,19 +456,19 @@ export default function Customers() {
 
         <Card className="bg-card border-border">
           <CardHeader>
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <CardTitle className="flex items-center space-x-2">
                 <Users className="h-5 w-5" />
                 <span>Lista de Clientes</span>
               </CardTitle>
-              <div className="flex items-center space-x-4">
-                <div className="relative">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:space-x-4">
+                <div className="relative w-full sm:w-auto">
                   <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     placeholder="Buscar clientes..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10 w-64"
+                    className="pl-10 w-full sm:w-64"
                   />
                 </div>
                 <div className="flex items-center space-x-2">
