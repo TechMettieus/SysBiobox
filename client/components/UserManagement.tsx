@@ -112,8 +112,13 @@ export default function UserManagement() {
             ({ id: permId, name: permId, module: "system", actions: [] } as any)
           );
         }),
-        createdAt: parseDate(u.created_at) || parseDate(u.createdAt) || new Date(),
-        updatedAt: parseDate(u.updated_at) || parseDate(u.updatedAt) || parseDate(u.created_at) || new Date(),
+        createdAt:
+          parseDate(u.created_at) || parseDate(u.createdAt) || new Date(),
+        updatedAt:
+          parseDate(u.updated_at) ||
+          parseDate(u.updatedAt) ||
+          parseDate(u.created_at) ||
+          new Date(),
         createdBy: u.createdBy || "system",
       }));
       setUsers(formattedUsers.length > 0 ? formattedUsers : mockUsers);
@@ -289,7 +294,10 @@ export default function UserManagement() {
               const initializeFirebaseApp = mod.initializeApp;
               deleteAppFn = mod.deleteApp;
 
-              secondary = initializeFirebaseApp((app as any).options, `auth-create-${Date.now()}`);
+              secondary = initializeFirebaseApp(
+                (app as any).options,
+                `auth-create-${Date.now()}`,
+              );
               secondaryAuth = getAuth(secondary);
 
               const userCredential = await createUserWithEmailAndPassword(
@@ -313,7 +321,10 @@ export default function UserManagement() {
             } catch (error: any) {
               // Log non-sensitive info, but avoid noisy stack for network errors
               if (error?.code === "auth/network-request-failed") {
-                console.warn("Firebase network error while creating user (fallback):", error.message);
+                console.warn(
+                  "Firebase network error while creating user (fallback):",
+                  error.message,
+                );
                 userId = `user-${Date.now()}`;
                 toast({
                   title: "Erro de rede no Firebase",
@@ -324,7 +335,8 @@ export default function UserManagement() {
               } else if (error?.code === "auth/email-already-in-use") {
                 toast({
                   title: "Email já cadastrado",
-                  description: "Este email já está sendo usado por outro usuário",
+                  description:
+                    "Este email já está sendo usado por outro usuário",
                   variant: "destructive",
                 });
                 // ensure cleanup of secondary app below
@@ -337,7 +349,10 @@ export default function UserManagement() {
                 } catch {}
                 return;
               } else {
-                console.warn("Firebase Auth error, falling back:", error?.message || error);
+                console.warn(
+                  "Firebase Auth error, falling back:",
+                  error?.message || error,
+                );
                 userId = `user-${Date.now()}`;
                 toast({
                   title: "Aviso",

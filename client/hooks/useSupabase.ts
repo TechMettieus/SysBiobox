@@ -147,13 +147,44 @@ export function useSupabase() {
     if (!value) return "pending";
     if (typeof value === "string") {
       const v = value.toLowerCase().trim();
-      if (["pending", "pendente", "pendent", "aguardando"].includes(v)) return "pending";
-      if (["confirmed", "confirmado", "confirmada"].includes(v)) return "confirmed";
-      if (["in_production", "in_production", "em_producao", "em_produção", "producing"].includes(v)) return "in_production";
-      if (["quality_check", "quality_check", "checagem_qualidade", "quality"].includes(v)) return "quality_check";
+      if (["pending", "pendente", "pendent", "aguardando"].includes(v))
+        return "pending";
+      if (["confirmed", "confirmado", "confirmada"].includes(v))
+        return "confirmed";
+      if (
+        [
+          "in_production",
+          "in_production",
+          "em_producao",
+          "em_produção",
+          "producing",
+        ].includes(v)
+      )
+        return "in_production";
+      if (
+        [
+          "quality_check",
+          "quality_check",
+          "checagem_qualidade",
+          "quality",
+        ].includes(v)
+      )
+        return "quality_check";
       if (["ready", "pronto", "prontos"].includes(v)) return "ready";
-      if (["delivered", "entregue", "concluido", "concluído", "completed", "finalizado", "finalizado"].includes(v)) return "delivered";
-      if (["cancelled", "cancelado", "cancelada"].includes(v)) return "cancelled";
+      if (
+        [
+          "delivered",
+          "entregue",
+          "concluido",
+          "concluído",
+          "completed",
+          "finalizado",
+          "finalizado",
+        ].includes(v)
+      )
+        return "delivered";
+      if (["cancelled", "cancelado", "cancelada"].includes(v))
+        return "cancelled";
       return v;
     }
     return String(value);
@@ -388,7 +419,9 @@ export function useSupabase() {
         // notify other components that orders changed
         try {
           if (typeof window !== "undefined") {
-            window.dispatchEvent(new CustomEvent("orders:changed", { detail: { id: saved.id } }));
+            window.dispatchEvent(
+              new CustomEvent("orders:changed", { detail: { id: saved.id } }),
+            );
           }
         } catch {}
         await logActivity({
@@ -420,7 +453,9 @@ export function useSupabase() {
     localStorage.setItem("biobox_orders", JSON.stringify([saved, ...orders]));
     try {
       if (typeof window !== "undefined") {
-        window.dispatchEvent(new CustomEvent("orders:changed", { detail: { id: saved.id } }));
+        window.dispatchEvent(
+          new CustomEvent("orders:changed", { detail: { id: saved.id } }),
+        );
       }
     } catch {}
     await logActivity({

@@ -62,8 +62,8 @@ function MetricCard({
                     trend === "up"
                       ? "text-biobox-green"
                       : trend === "down"
-                      ? "text-red-500"
-                      : "text-muted-foreground"
+                        ? "text-red-500"
+                        : "text-muted-foreground"
                   }`}
                 >
                   {trendValue}
@@ -93,7 +93,9 @@ type EnrichedOrder = {
 
 const normalizeStatus = (value: unknown): Order["status"] => {
   const normalized =
-    typeof value === "string" ? value.toLowerCase() : (value as Order["status"] | undefined);
+    typeof value === "string"
+      ? value.toLowerCase()
+      : (value as Order["status"] | undefined);
   const validStatuses: Order["status"][] = [
     "pending",
     "confirmed",
@@ -104,7 +106,9 @@ const normalizeStatus = (value: unknown): Order["status"] => {
     "cancelled",
   ];
 
-  return validStatuses.includes(normalized as Order["status"]) ? (normalized as Order["status"]) : "pending";
+  return validStatuses.includes(normalized as Order["status"])
+    ? (normalized as Order["status"])
+    : "pending";
 };
 
 const toNumber = (value: unknown, fallback = 0): number => {
@@ -206,13 +210,19 @@ export default function MetricsCards() {
     };
 
     if (typeof window !== "undefined") {
-      window.addEventListener("orders:changed", onOrdersChanged as EventListener);
+      window.addEventListener(
+        "orders:changed",
+        onOrdersChanged as EventListener,
+      );
       window.addEventListener("storage", onOrdersChanged as EventListener);
     }
 
     return () => {
       if (typeof window !== "undefined") {
-        window.removeEventListener("orders:changed", onOrdersChanged as EventListener);
+        window.removeEventListener(
+          "orders:changed",
+          onOrdersChanged as EventListener,
+        );
         window.removeEventListener("storage", onOrdersChanged as EventListener);
       }
     };
@@ -245,15 +255,27 @@ export default function MetricsCards() {
       });
 
       const activeOrders = enrichedOrders.filter(({ status }) =>
-        ["pending", "confirmed", "in_production", "quality_check", "ready"].includes(status),
+        [
+          "pending",
+          "confirmed",
+          "in_production",
+          "quality_check",
+          "ready",
+        ].includes(status),
       ).length;
 
       const urgentOrders = enrichedOrders.filter(
-        ({ raw, status }) => raw.priority === "urgent" && !["delivered", "cancelled"].includes(status),
+        ({ raw, status }) =>
+          raw.priority === "urgent" &&
+          !["delivered", "cancelled"].includes(status),
       ).length;
 
-      const inProductionOrders = enrichedOrders.filter(({ status }) => status === "in_production").length;
-      const readyOrders = enrichedOrders.filter(({ status }) => status === "ready").length;
+      const inProductionOrders = enrichedOrders.filter(
+        ({ status }) => status === "in_production",
+      ).length;
+      const readyOrders = enrichedOrders.filter(
+        ({ status }) => status === "ready",
+      ).length;
 
       const delayedOrders = enrichedOrders.filter(
         ({ status, deliveryDate }) =>
@@ -263,21 +285,34 @@ export default function MetricsCards() {
       ).length;
 
       const monthlyRevenue = enrichedOrders
-        .filter(({ status, createdAt }) => createdAt >= monthStart && status !== "cancelled")
+        .filter(
+          ({ status, createdAt }) =>
+            createdAt >= monthStart && status !== "cancelled",
+        )
         .reduce((sum, entry) => sum + entry.totalAmount, 0);
 
       const completedToday = enrichedOrders.filter(
         ({ status, completedDate }) =>
-          status === "delivered" && completedDate !== null && completedDate >= today,
+          status === "delivered" &&
+          completedDate !== null &&
+          completedDate >= today,
       ).length;
 
       const receivableEntries = enrichedOrders.filter(
         ({ status }) => !["delivered", "cancelled"].includes(status),
       );
-      const receivableValue = receivableEntries.reduce((sum, entry) => sum + entry.totalAmount, 0);
+      const receivableValue = receivableEntries.reduce(
+        (sum, entry) => sum + entry.totalAmount,
+        0,
+      );
 
-      const deliveredEntries = enrichedOrders.filter(({ status }) => status === "delivered");
-      const receivedValue = deliveredEntries.reduce((sum, entry) => sum + entry.totalAmount, 0);
+      const deliveredEntries = enrichedOrders.filter(
+        ({ status }) => status === "delivered",
+      );
+      const receivedValue = deliveredEntries.reduce(
+        (sum, entry) => sum + entry.totalAmount,
+        0,
+      );
 
       setMetrics({
         activeOrders,
@@ -326,8 +361,16 @@ export default function MetricsCards() {
   }
 
   const revenueTarget = 180000;
-  const revenuePercentage = revenueTarget > 0 ? Math.round((metrics.monthlyRevenue / revenueTarget) * 100) : 0;
-  const revenueTrend: MetricTrend = revenuePercentage >= 50 ? "up" : metrics.monthlyRevenue > 0 ? "down" : "neutral";
+  const revenuePercentage =
+    revenueTarget > 0
+      ? Math.round((metrics.monthlyRevenue / revenueTarget) * 100)
+      : 0;
+  const revenueTrend: MetricTrend =
+    revenuePercentage >= 50
+      ? "up"
+      : metrics.monthlyRevenue > 0
+        ? "down"
+        : "neutral";
 
   return (
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
@@ -356,8 +399,8 @@ export default function MetricsCards() {
           metrics.delayedOrders > 0
             ? "down"
             : metrics.activeOrders > 0
-            ? "up"
-            : "neutral"
+              ? "up"
+              : "neutral"
         }
         trendValue={
           metrics.delayedOrders > 0
@@ -408,8 +451,8 @@ export default function MetricsCards() {
           revenuePercentage >= 80
             ? "green"
             : revenuePercentage >= 50
-            ? "orange"
-            : "red"
+              ? "orange"
+              : "red"
         }
       />
     </div>
