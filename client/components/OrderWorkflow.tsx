@@ -63,9 +63,15 @@ interface WorkflowStep {
   }[];
 }
 
-export default function OrderWorkflow({ order, onUpdate, operators = [] }: OrderWorkflowProps) {
+export default function OrderWorkflow({
+  order,
+  onUpdate,
+  operators = [],
+}: OrderWorkflowProps) {
   const [showActionDialog, setShowActionDialog] = useState(false);
-  const [actionType, setActionType] = useState<"advance" | "issue" | "cancel" | null>(null);
+  const [actionType, setActionType] = useState<
+    "advance" | "issue" | "cancel" | null
+  >(null);
   const [actionData, setActionData] = useState<any>({
     notes: "",
     operator: "",
@@ -186,7 +192,9 @@ export default function OrderWorkflow({ order, onUpdate, operators = [] }: Order
     },
   ];
 
-  const currentStepIndex = workflowSteps.findIndex((step) => step.id === order.status);
+  const currentStepIndex = workflowSteps.findIndex(
+    (step) => step.id === order.status,
+  );
   const currentStep = workflowSteps[currentStepIndex];
 
   const openActionDialog = (type: "advance" | "issue" | "cancel") => {
@@ -218,7 +226,7 @@ export default function OrderWorkflow({ order, onUpdate, operators = [] }: Order
   const handleAction = async () => {
     try {
       setLoading(true);
-      
+
       const updates: Partial<Order> = {
         notes: actionData.notes || order.notes,
       };
@@ -227,7 +235,7 @@ export default function OrderWorkflow({ order, onUpdate, operators = [] }: Order
         const nextStatus = getNextStatus();
         if (nextStatus) {
           updates.status = nextStatus;
-          
+
           // Atualizar progresso baseado no status
           const progressMap: Record<Order["status"], number> = {
             pending: 0,
@@ -239,12 +247,12 @@ export default function OrderWorkflow({ order, onUpdate, operators = [] }: Order
             cancelled: 0,
           };
           updates.production_progress = progressMap[nextStatus];
-          
+
           // Adicionar operador se especificado
           if (actionData.operator) {
             updates.assigned_operator = actionData.operator;
           }
-          
+
           // Marcar data de conclusão se entregue
           if (nextStatus === "delivered") {
             updates.completed_date = new Date().toISOString();
@@ -260,12 +268,12 @@ export default function OrderWorkflow({ order, onUpdate, operators = [] }: Order
       }
 
       await onUpdate(order.id, updates);
-      
+
       toast({
         title: "Pedido atualizado",
         description: "As alterações foram salvas com sucesso.",
       });
-      
+
       setShowActionDialog(false);
     } catch (error) {
       console.error("Erro ao atualizar pedido:", error);
@@ -337,7 +345,7 @@ export default function OrderWorkflow({ order, onUpdate, operators = [] }: Order
                       "w-10 h-10 rounded-full flex items-center justify-center transition-colors",
                       isCompleted && "bg-biobox-green text-white",
                       isCurrent && "bg-blue-500 text-white animate-pulse",
-                      isFuture && "bg-gray-300 text-gray-500"
+                      isFuture && "bg-gray-300 text-gray-500",
                     )}
                   >
                     <StepIcon className="h-5 w-5" />
@@ -346,7 +354,7 @@ export default function OrderWorkflow({ order, onUpdate, operators = [] }: Order
                     <div
                       className={cn(
                         "w-0.5 h-20 mt-2",
-                        isCompleted ? "bg-biobox-green" : "bg-gray-300"
+                        isCompleted ? "bg-biobox-green" : "bg-gray-300",
                       )}
                     />
                   )}
@@ -355,8 +363,10 @@ export default function OrderWorkflow({ order, onUpdate, operators = [] }: Order
                 {/* Step Content */}
                 <div className="flex-1">
                   <h4 className="font-medium mb-1">{step.label}</h4>
-                  <p className="text-sm text-muted-foreground mb-3">{step.description}</p>
-                  
+                  <p className="text-sm text-muted-foreground mb-3">
+                    {step.description}
+                  </p>
+
                   {isCurrent && (
                     <div className="space-y-3">
                       {/* Action Buttons */}
@@ -376,7 +386,7 @@ export default function OrderWorkflow({ order, onUpdate, operators = [] }: Order
                           ))}
                         </div>
                       )}
-                      
+
                       {/* Current Status Info */}
                       <div className="bg-muted/30 p-3 rounded-lg space-y-2">
                         {order.assigned_operator && (
@@ -387,7 +397,9 @@ export default function OrderWorkflow({ order, onUpdate, operators = [] }: Order
                         )}
                         <div className="flex items-center text-sm">
                           <Calendar className="h-4 w-4 mr-2 text-muted-foreground" />
-                          <span>Atualizado: {formatDate(order.updated_at)}</span>
+                          <span>
+                            Atualizado: {formatDate(order.updated_at)}
+                          </span>
                         </div>
                         {order.notes && (
                           <div className="flex items-start text-sm">
@@ -414,36 +426,49 @@ export default function OrderWorkflow({ order, onUpdate, operators = [] }: Order
                 {actionType === "cancel" && "Cancelar Pedido"}
               </DialogTitle>
               <DialogDescription>
-                {actionType === "advance" && "Confirme os detalhes para avançar o pedido para a próxima etapa."}
-                {actionType === "issue" && "Descreva o problema encontrado no processamento do pedido."}
-                {actionType === "cancel" && "Informe o motivo do cancelamento do pedido."}
+                {actionType === "advance" &&
+                  "Confirme os detalhes para avançar o pedido para a próxima etapa."}
+                {actionType === "issue" &&
+                  "Descreva o problema encontrado no processamento do pedido."}
+                {actionType === "cancel" &&
+                  "Informe o motivo do cancelamento do pedido."}
               </DialogDescription>
             </DialogHeader>
-            
+
             <div className="space-y-4">
-              {actionType === "advance" && currentStep?.requiredFields?.includes("operator") && (
-                <div>
-                  <Label>Operador Responsável</Label>
-                  <Select
-                    value={actionData.operator}
-                    onValueChange={(value) =>
-                      setActionData((prev: any) => ({ ...prev, operator: value }))
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione um operador" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Carlos Mendes">Carlos Mendes</SelectItem>
-                      <SelectItem value="Ana Lima">Ana Lima</SelectItem>
-                      <SelectItem value="José Roberto">José Roberto</SelectItem>
-                      <SelectItem value="Maria Silva">Maria Silva</SelectItem>
-                      <SelectItem value="Pedro Santos">Pedro Santos</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-              
+              {actionType === "advance" &&
+                currentStep?.requiredFields?.includes("operator") && (
+                  <div>
+                    <Label>Operador Responsável</Label>
+                    <Select
+                      value={actionData.operator}
+                      onValueChange={(value) =>
+                        setActionData((prev: any) => ({
+                          ...prev,
+                          operator: value,
+                        }))
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione um operador" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Carlos Mendes">
+                          Carlos Mendes
+                        </SelectItem>
+                        <SelectItem value="Ana Lima">Ana Lima</SelectItem>
+                        <SelectItem value="José Roberto">
+                          José Roberto
+                        </SelectItem>
+                        <SelectItem value="Maria Silva">Maria Silva</SelectItem>
+                        <SelectItem value="Pedro Santos">
+                          Pedro Santos
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
               {actionType === "issue" && (
                 <div>
                   <Label>Descrição do Problema</Label>
@@ -460,51 +485,70 @@ export default function OrderWorkflow({ order, onUpdate, operators = [] }: Order
                   />
                 </div>
               )}
-              
+
               {actionType === "cancel" && (
                 <div>
                   <Label>Motivo do Cancelamento</Label>
                   <Select
                     value={actionData.cancelReason}
                     onValueChange={(value) =>
-                      setActionData((prev: any) => ({ ...prev, cancelReason: value }))
+                      setActionData((prev: any) => ({
+                        ...prev,
+                        cancelReason: value,
+                      }))
                     }
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione o motivo" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Cliente cancelou">Cliente cancelou</SelectItem>
-                      <SelectItem value="Falta de material">Falta de material</SelectItem>
-                      <SelectItem value="Problema na produção">Problema na produção</SelectItem>
-                      <SelectItem value="Erro no pedido">Erro no pedido</SelectItem>
+                      <SelectItem value="Cliente cancelou">
+                        Cliente cancelou
+                      </SelectItem>
+                      <SelectItem value="Falta de material">
+                        Falta de material
+                      </SelectItem>
+                      <SelectItem value="Problema na produção">
+                        Problema na produção
+                      </SelectItem>
+                      <SelectItem value="Erro no pedido">
+                        Erro no pedido
+                      </SelectItem>
                       <SelectItem value="Outro">Outro</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               )}
-              
+
               <div>
                 <Label>Observações Adicionais</Label>
                 <Textarea
                   value={actionData.notes}
                   onChange={(e) =>
-                    setActionData((prev: any) => ({ ...prev, notes: e.target.value }))
+                    setActionData((prev: any) => ({
+                      ...prev,
+                      notes: e.target.value,
+                    }))
                   }
                   placeholder="Adicione observações relevantes..."
                   rows={3}
                 />
               </div>
             </div>
-            
+
             <DialogFooter>
-              <Button variant="outline" onClick={() => setShowActionDialog(false)}>
+              <Button
+                variant="outline"
+                onClick={() => setShowActionDialog(false)}
+              >
                 Cancelar
               </Button>
-              <Button 
-                onClick={handleAction} 
+              <Button
+                onClick={handleAction}
                 disabled={loading}
-                className={actionType === "cancel" ? "bg-red-500 hover:bg-red-600" : ""}
+                className={
+                  actionType === "cancel" ? "bg-red-500 hover:bg-red-600" : ""
+                }
               >
                 {loading ? "Processando..." : "Confirmar"}
               </Button>

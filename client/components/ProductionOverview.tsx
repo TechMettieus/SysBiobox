@@ -57,8 +57,8 @@ export default function ProductionOverview() {
       setLoading(true);
       const orders = await getOrders();
 
-      const inProduction = orders.filter(order =>
-        ['confirmed', 'in_production', 'quality_check'].includes(order.status)
+      const inProduction = orders.filter((order) =>
+        ["confirmed", "in_production", "quality_check"].includes(order.status),
       );
 
       setProductionItems(inProduction);
@@ -132,7 +132,10 @@ export default function ProductionOverview() {
           <CardTitle className="text-lg font-semibold text-foreground">
             Visão Geral da Produção
           </CardTitle>
-          <Badge variant="outline" className="border-biobox-green text-biobox-green">
+          <Badge
+            variant="outline"
+            className="border-biobox-green text-biobox-green"
+          >
             {productionItems.length} em produção
           </Badge>
         </div>
@@ -187,7 +190,10 @@ export default function ProductionOverview() {
                   )}
                   <div className="flex items-center space-x-1 text-muted-foreground">
                     <Clock className="h-3 w-3" />
-                    <span>Conclusão em {calculateEstimatedCompletion(item.production_progress)}</span>
+                    <span>
+                      Conclusão em{" "}
+                      {calculateEstimatedCompletion(item.production_progress)}
+                    </span>
                   </div>
                 </div>
               </div>

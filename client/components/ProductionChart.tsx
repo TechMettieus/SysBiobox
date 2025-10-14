@@ -33,37 +33,52 @@ export default function ProductionChart() {
     try {
       setLoading(true);
       const orders = await getOrders();
-      
-      console.log('📦 Total de pedidos carregados:', orders.length);
-      
-      const days = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab', 'Dom'];
+
+      console.log("📦 Total de pedidos carregados:", orders.length);
+
+      const days = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sab", "Dom"];
       const today = new Date();
       const weekStart = new Date(today);
       weekStart.setDate(today.getDate() - today.getDay() + 1); // Segunda-feira
-      
-      console.log('📅 Semana atual começa em:', weekStart.toLocaleDateString('pt-BR'));
-      
+
+      console.log(
+        "📅 Semana atual começa em:",
+        weekStart.toLocaleDateString("pt-BR"),
+      );
+
       const weekData = days.map((day, index) => {
         const date = new Date(weekStart);
         date.setDate(weekStart.getDate() + index);
         date.setHours(0, 0, 0, 0);
-        
+
         // Filtrar pedidos do dia
-        const dayOrders = orders.filter(order => {
+        const dayOrders = orders.filter((order) => {
           const orderDate = new Date(order.scheduled_date);
           orderDate.setHours(0, 0, 0, 0);
-          return orderDate.getTime() === date.getTime() && 
-                 ['in_production', 'quality_check', 'ready', 'delivered'].includes(order.status);
+          return (
+            orderDate.getTime() === date.getTime() &&
+            ["in_production", "quality_check", "ready", "delivered"].includes(
+              order.status,
+            )
+          );
         });
-        
-        console.log(`📅 ${day} (${date.toLocaleDateString('pt-BR')}):`, dayOrders.length, 'pedidos');
-        
+
+        console.log(
+          `📅 ${day} (${date.toLocaleDateString("pt-BR")}):`,
+          dayOrders.length,
+          "pedidos",
+        );
+
         // Calcular quantidade produzida
         const produced = dayOrders.reduce((sum, order) => {
           // Se tem produtos
           if (order.products && Array.isArray(order.products)) {
-            return sum + order.products.reduce((pSum, product) => 
-              pSum + (product.quantity || 0), 0
+            return (
+              sum +
+              order.products.reduce(
+                (pSum, product) => pSum + (product.quantity || 0),
+                0,
+              )
             );
           }
           // Se tem quantidade total
@@ -72,19 +87,25 @@ export default function ProductionChart() {
           }
           return sum;
         }, 0);
-        
+
         // Calcular planejado (todos os pedidos agendados para o dia)
-        const dayPlannedOrders = orders.filter(order => {
+        const dayPlannedOrders = orders.filter((order) => {
           const orderDate = new Date(order.scheduled_date);
           orderDate.setHours(0, 0, 0, 0);
-          return orderDate.getTime() === date.getTime() &&
-                 !['cancelled'].includes(order.status);
+          return (
+            orderDate.getTime() === date.getTime() &&
+            !["cancelled"].includes(order.status)
+          );
         });
-        
+
         const planned = dayPlannedOrders.reduce((sum, order) => {
           if (order.products && Array.isArray(order.products)) {
-            return sum + order.products.reduce((pSum, product) => 
-              pSum + (product.quantity || 0), 0
+            return (
+              sum +
+              order.products.reduce(
+                (pSum, product) => pSum + (product.quantity || 0),
+                0,
+              )
             );
           }
           if (order.total_quantity) {
@@ -92,28 +113,34 @@ export default function ProductionChart() {
           }
           return sum + 1; // Se não tem quantidade, conta como 1 item
         }, 0);
-        
-        return { 
-          day, 
-          produced, 
-          planned: Math.max(produced, planned) // Planejado sempre >= produzido
+
+        return {
+          day,
+          produced,
+          planned: Math.max(produced, planned), // Planejado sempre >= produzido
         };
       });
-      
-      console.log('📊 Dados da semana:', weekData);
+
+      console.log("📊 Dados da semana:", weekData);
       setProductionData(weekData);
     } catch (error) {
       console.error("❌ Erro ao carregar dados de produção:", error);
       // Dados de fallback
-      const days = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab', 'Dom'];
-      setProductionData(days.map(day => ({ day, produced: 0, planned: 0 })));
+      const days = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sab", "Dom"];
+      setProductionData(days.map((day) => ({ day, produced: 0, planned: 0 })));
     } finally {
       setLoading(false);
     }
   };
 
-  const totalProduced = productionData.reduce((sum, data) => sum + data.produced, 0);
-  const totalPlanned = productionData.reduce((sum, data) => sum + data.planned, 0);
+  const totalProduced = productionData.reduce(
+    (sum, data) => sum + data.produced,
+    0,
+  );
+  const totalPlanned = productionData.reduce(
+    (sum, data) => sum + data.planned,
+    0,
+  );
 
   if (loading) {
     return (
@@ -127,7 +154,9 @@ export default function ProductionChart() {
           <div className="h-80 flex items-center justify-center">
             <div className="text-center">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-biobox-green mx-auto mb-4"></div>
-              <p className="text-muted-foreground">Carregando dados de produção...</p>
+              <p className="text-muted-foreground">
+                Carregando dados de produção...
+              </p>
             </div>
           </div>
         </CardContent>
@@ -143,7 +172,14 @@ export default function ProductionChart() {
             Produção Semanal
           </CardTitle>
           <div className="flex items-center space-x-2">
-            <Badge variant="outline" className={isConnected ? "border-biobox-green text-biobox-green" : "border-orange-500 text-orange-500"}>
+            <Badge
+              variant="outline"
+              className={
+                isConnected
+                  ? "border-biobox-green text-biobox-green"
+                  : "border-orange-500 text-orange-500"
+              }
+            >
               {isConnected ? "Online" : "Offline"}
             </Badge>
           </div>
@@ -157,8 +193,8 @@ export default function ProductionChart() {
               Nenhum dado de produção nesta semana
             </p>
             <p className="text-xs text-muted-foreground max-w-md">
-              Crie pedidos com datas de produção nesta semana para ver o gráfico.
-              Os pedidos agendados aparecerão aqui automaticamente.
+              Crie pedidos com datas de produção nesta semana para ver o
+              gráfico. Os pedidos agendados aparecerão aqui automaticamente.
             </p>
           </div>
         ) : (
@@ -167,7 +203,13 @@ export default function ProductionChart() {
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={productionData}>
                   <defs>
-                    <linearGradient id="colorProduced" x1="0" y1="0" x2="0" y2="1">
+                    <linearGradient
+                      id="colorProduced"
+                      x1="0"
+                      y1="0"
+                      x2="0"
+                      y2="1"
+                    >
                       <stop
                         offset="5%"
                         stopColor="hsl(144 61% 54%)"
@@ -180,7 +222,10 @@ export default function ProductionChart() {
                       />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(220 13% 15%)" />
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    stroke="hsl(220 13% 15%)"
+                  />
                   <XAxis
                     dataKey="day"
                     axisLine={false}
@@ -238,11 +283,13 @@ export default function ProductionChart() {
                 <span className="font-semibold">{totalProduced}</span>
                 {totalPlanned > 0 && (
                   <>
-                    {' / '}
-                    <span className="text-muted-foreground">{totalPlanned} planejado</span>
+                    {" / "}
+                    <span className="text-muted-foreground">
+                      {totalPlanned} planejado
+                    </span>
                   </>
-                )}
-                {' '}esta semana
+                )}{" "}
+                esta semana
               </div>
             </div>
           </>
