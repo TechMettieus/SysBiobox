@@ -376,6 +376,14 @@ export default function MetricsCards() {
 
       console.log("📊 [MetricsCards] Métricas calculadas:", calculatedMetrics);
 
+      // Salvar no cache para persistir entre recarregamentos
+      try {
+        localStorage.setItem('biobox_metrics_cache', JSON.stringify(calculatedMetrics));
+        console.log("💾 [MetricsCards] Métricas salvas no cache");
+      } catch (err) {
+        console.warn("⚠️ [MetricsCards] Erro ao salvar cache:", err);
+      }
+
       if (isMountedRef.current) {
         setMetrics(calculatedMetrics);
       }

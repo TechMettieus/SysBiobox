@@ -392,6 +392,14 @@ export function useFirebase() {
           } : null
         });
 
+        // Salvar no localStorage para cache
+        try {
+          localStorage.setItem("biobox_orders", JSON.stringify(orders));
+          console.log("💾 [getOrders] Pedidos salvos no cache");
+        } catch (err) {
+          console.warn("⚠️ [getOrders] Erro ao salvar cache:", err);
+        }
+
         return orders;
       } catch (err) {
         console.error("❌ [getOrders] Erro no Firestore:", err);
