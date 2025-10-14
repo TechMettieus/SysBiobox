@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Clock, User, Package } from "lucide-react";
-import { useSupabase } from "@/hooks/useSupabase";
+import { useFirebase } from "@/hooks/useFirebase";
 
 const statusColors = {
   cutting: "bg-orange-500/10 text-orange-500 border-orange-500/20",
@@ -46,7 +46,7 @@ const priorityColors = {
 export default function ProductionOverview() {
   const [loading, setLoading] = useState(true);
   const [productionItems, setProductionItems] = useState<any[]>([]);
-  const { getOrders } = useSupabase();
+  const { getOrders } = useFirebase();
 
   useEffect(() => {
     loadProductionData();
