@@ -37,7 +37,7 @@ import {
   XCircle,
   CheckCheck,
 } from "lucide-react";
-import { Order } from "@/hooks/useSupabase";
+import { Order } from "@/hooks/useFirebase";
 import { useToast } from "@/components/ui/use-toast";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
