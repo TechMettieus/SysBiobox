@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
-import { createRoot } from 'react-dom/client';
+import { createRoot } from "react-dom/client";
 import OrderPrintTemplate from "@/components/OrderPrintTemplate";
 import DashboardLayout from "@/components/DashboardLayout";
 import NewOrderForm from "@/components/NewOrderForm";
@@ -114,32 +114,38 @@ const fragmentStatusColors = {
 const PAGE_SIZE = 10;
 
 // Componente auxiliar para mudanças rápidas de status
-const QuickStatusChange = ({ 
-  order, 
-  onTransition 
-}: { 
-  order: Order; 
-  onTransition: (order: Order, status: Order["status"], progress?: number) => void;
+const QuickStatusChange = ({
+  order,
+  onTransition,
+}: {
+  order: Order;
+  onTransition: (
+    order: Order,
+    status: Order["status"],
+    progress?: number,
+  ) => void;
 }) => {
   const nextStatuses = {
     pending: [
-      { status: 'confirmed', label: 'Confirmar', color: 'bg-blue-500' },
-      { status: 'cancelled', label: 'Cancelar', color: 'bg-red-500' },
+      { status: "confirmed", label: "Confirmar", color: "bg-blue-500" },
+      { status: "cancelled", label: "Cancelar", color: "bg-red-500" },
     ],
     confirmed: [
-      { status: 'in_production', label: 'Iniciar Produção', color: 'bg-purple-500' },
-      { status: 'cancelled', label: 'Cancelar', color: 'bg-red-500' },
+      {
+        status: "in_production",
+        label: "Iniciar Produção",
+        color: "bg-purple-500",
+      },
+      { status: "cancelled", label: "Cancelar", color: "bg-red-500" },
     ],
     in_production: [
-      { status: 'quality_check', label: 'CQ', color: 'bg-orange-500' },
+      { status: "quality_check", label: "CQ", color: "bg-orange-500" },
     ],
     quality_check: [
-      { status: 'ready', label: 'Aprovar', color: 'bg-green-500' },
-      { status: 'in_production', label: 'Reprovar', color: 'bg-purple-500' },
+      { status: "ready", label: "Aprovar", color: "bg-green-500" },
+      { status: "in_production", label: "Reprovar", color: "bg-purple-500" },
     ],
-    ready: [
-      { status: 'delivered', label: 'Entregar', color: 'bg-gray-500' },
-    ],
+    ready: [{ status: "delivered", label: "Entregar", color: "bg-gray-500" }],
   } as const;
 
   const options = nextStatuses[order.status as keyof typeof nextStatuses] || [];
@@ -154,10 +160,15 @@ const QuickStatusChange = ({
           size="sm"
           className={`${option.color} hover:opacity-90 text-white`}
           onClick={async () => {
-            const progress = option.status === 'in_production' ? 10 :
-                           option.status === 'quality_check' ? 80 :
-                           option.status === 'ready' ? 100 : undefined;
-            onTransition(order, option.status as Order['status'], progress);
+            const progress =
+              option.status === "in_production"
+                ? 10
+                : option.status === "quality_check"
+                  ? 80
+                  : option.status === "ready"
+                    ? 100
+                    : undefined;
+            onTransition(order, option.status as Order["status"], progress);
           }}
         >
           {option.label}
@@ -171,8 +182,12 @@ export default function OrdersSupabase() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | Order["status"]>("all");
-  const [priorityFilter, setPriorityFilter] = useState<"all" | Order["priority"]>("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | Order["status"]>(
+    "all",
+  );
+  const [priorityFilter, setPriorityFilter] = useState<
+    "all" | Order["priority"]
+  >("all");
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [showOrderDetails, setShowOrderDetails] = useState(false);
   const [showNewOrderForm, setShowNewOrderForm] = useState(false);
@@ -183,22 +198,21 @@ export default function OrdersSupabase() {
 
   const { checkPermission } = useAuth();
   const supabaseHook = useSupabase();
-  const { 
-    getOrders, 
-    createOrder, 
-    updateOrder, 
-    isConnected 
-  } = supabaseHook;
-  
+  const { getOrders, createOrder, updateOrder, isConnected } = supabaseHook;
+
   // Verificar se deleteOrder existe, senão usar uma implementação local
-  const deleteOrderFn = supabaseHook.deleteOrder || (async (orderId: string) => {
-    console.log('⚠️ deleteOrder não existe no hook, usando implementação local');
-    // Implementação local usando updateOrder para marcar como deletado
-    // ou remover do estado local
-    setOrders(prev => prev.filter(o => o.id !== orderId));
-    return true;
-  });
-  
+  const deleteOrderFn =
+    supabaseHook.deleteOrder ||
+    (async (orderId: string) => {
+      console.log(
+        "⚠️ deleteOrder não existe no hook, usando implementação local",
+      );
+      // Implementação local usando updateOrder para marcar como deletado
+      // ou remover do estado local
+      setOrders((prev) => prev.filter((o) => o.id !== orderId));
+      return true;
+    });
+
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -263,13 +277,18 @@ export default function OrdersSupabase() {
       orderId: fragment.order_id,
       fragmentNumber: fragment.fragment_number,
       quantity: toNumber(fragment.quantity),
-      scheduledDate: toDate(fragment.scheduled_date, toDate(order.scheduled_date)),
+      scheduledDate: toDate(
+        fragment.scheduled_date,
+        toDate(order.scheduled_date),
+      ),
       status: fragment.status,
       progress: toNumber(fragment.progress),
       value: toNumber(fragment.value),
       assignedOperator: fragment.assigned_operator,
       startedAt: fragment.started_at ? toDate(fragment.started_at) : undefined,
-      completedAt: fragment.completed_at ? toDate(fragment.completed_at) : undefined,
+      completedAt: fragment.completed_at
+        ? toDate(fragment.completed_at)
+        : undefined,
     }));
   };
 
@@ -279,7 +298,8 @@ export default function OrdersSupabase() {
   ): DbOrderFragment[] =>
     fragments.map((fragment, index) => {
       const fragmentNumber = fragment.fragmentNumber || index + 1;
-      const fragmentId = fragment.id || `${orderId}-frag-${fragmentNumber}-${Date.now()}`;
+      const fragmentId =
+        fragment.id || `${orderId}-frag-${fragmentNumber}-${Date.now()}`;
       return {
         id: fragmentId,
         order_id: orderId,
@@ -290,8 +310,12 @@ export default function OrdersSupabase() {
         progress: toNumber(fragment.progress),
         value: toNumber(fragment.value),
         assigned_operator: fragment.assignedOperator,
-        started_at: fragment.startedAt ? fragment.startedAt.toISOString() : undefined,
-        completed_at: fragment.completedAt ? fragment.completedAt.toISOString() : undefined,
+        started_at: fragment.startedAt
+          ? fragment.startedAt.toISOString()
+          : undefined,
+        completed_at: fragment.completedAt
+          ? fragment.completedAt.toISOString()
+          : undefined,
       };
     });
 
@@ -399,9 +423,13 @@ export default function OrdersSupabase() {
     return orders.filter((order) => {
       const matchesSearch =
         order.order_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (order.customer_name || "").toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesStatus = statusFilter === "all" || order.status === statusFilter;
-      const matchesPriority = priorityFilter === "all" || order.priority === priorityFilter;
+        (order.customer_name || "")
+          .toLowerCase()
+          .includes(searchTerm.toLowerCase());
+      const matchesStatus =
+        statusFilter === "all" || order.status === statusFilter;
+      const matchesPriority =
+        priorityFilter === "all" || order.priority === priorityFilter;
       const matchesTab = activeTab === "all" || order.status === activeTab;
       return matchesSearch && matchesStatus && matchesPriority && matchesTab;
     });
@@ -426,15 +454,23 @@ export default function OrdersSupabase() {
   const hasOrders = filteredOrders.length > 0;
   const rangeStart = hasOrders ? (currentPage - 1) * PAGE_SIZE + 1 : 0;
   const rangeEnd = hasOrders
-    ? Math.min(filteredOrders.length, Math.max(rangeStart, rangeStart + paginatedOrders.length - 1))
+    ? Math.min(
+        filteredOrders.length,
+        Math.max(rangeStart, rangeStart + paginatedOrders.length - 1),
+      )
     : 0;
 
   const stats = useMemo(() => {
     const totalOrders = orders.length;
     const pendingOrders = orders.filter((o) => o.status === "pending").length;
-    const inProductionOrders = orders.filter((o) => o.status === "in_production").length;
+    const inProductionOrders = orders.filter(
+      (o) => o.status === "in_production",
+    ).length;
     const readyOrders = orders.filter((o) => o.status === "ready").length;
-    const totalRevenue = orders.reduce((sum, order) => sum + (order.total_amount || 0), 0);
+    const totalRevenue = orders.reduce(
+      (sum, order) => sum + (order.total_amount || 0),
+      0,
+    );
     const urgentOrders = orders.filter((o) => o.priority === "urgent").length;
     const overdueOrders = orders.filter(
       (o) =>
@@ -599,7 +635,8 @@ export default function OrdersSupabase() {
 
   const applyUpdate = (updated: Order) => {
     setOrders((prev) => prev.map((o) => (o.id === updated.id ? updated : o)));
-    if (selectedOrder && selectedOrder.id === updated.id) setSelectedOrder(updated);
+    if (selectedOrder && selectedOrder.id === updated.id)
+      setSelectedOrder(updated);
   };
 
   const handleTransition = async (
@@ -609,6 +646,9 @@ export default function OrdersSupabase() {
   ) => {
     const updates: Partial<Order> = { status: nextStatus };
     if (typeof progress === "number") updates.production_progress = progress;
+    if (nextStatus === "delivered") {
+      (updates as any).completed_date = new Date().toISOString();
+    }
     const updated = await updateOrder(order.id, updates);
     if (updated) {
       applyUpdate(updated);
@@ -617,7 +657,7 @@ export default function OrdersSupabase() {
         description: `Pedido ${updated.order_number} agora está em "${statusLabels[nextStatus]}"`,
       });
       if (nextStatus === "in_production") {
-        navigate("/production");
+        navigate(`/production?orderId=${updated.id}`);
       }
     }
   };
@@ -643,11 +683,11 @@ export default function OrdersSupabase() {
   };
 
   const handlePrintOrder = (order: Order | null) => {
-  if (!order) return;
-   const printWindow = window.open("", "_blank");
-   if (printWindow) {
-    // Configurar documento HTML
-    printWindow.document.write(`
+    if (!order) return;
+    const printWindow = window.open("", "_blank");
+    if (printWindow) {
+      // Configurar documento HTML
+      printWindow.document.write(`
       <!DOCTYPE html>
       <html>
         <head>
@@ -679,33 +719,41 @@ export default function OrdersSupabase() {
         </body>
       </html>
     `);
-    printWindow.document.close();
+      printWindow.document.close();
 
+      // Criar container React e renderizar o template
+      const container = printWindow.document.getElementById("print-root");
+      if (container) {
+        const root = createRoot(container);
+        root.render(<OrderPrintTemplate order={order} />);
 
-// Criar container React e renderizar o template
-    const container = printWindow.document.getElementById('print-root');
-    if (container) {
-      const root = createRoot(container);
-      root.render(<OrderPrintTemplate order={order} />);
-      
-      // Aguardar renderização e imprimir
-      setTimeout(() => {
-        printWindow.focus();
-        printWindow.print();
-        
-        // Fechar após impressão (opcional)
+        // Aguardar renderização e imprimir
         setTimeout(() => {
-          printWindow.close();
-        }, 100);
-      }, 500);
-    }
-  }
-};
+          printWindow.focus();
+          printWindow.print();
 
-    
+          // Fechar após impressão (opcional)
+          setTimeout(() => {
+            printWindow.close();
+          }, 100);
+        }, 500);
+      }
+    }
+  };
+
   const handleExportReport = () => {
     const csvContent = [
-      ["Pedido", "Cliente", "Vendedor", "Status", "Prioridade", "Data Produção", "Data Entrega", "Valor", "Progresso"].join(","),
+      [
+        "Pedido",
+        "Cliente",
+        "Vendedor",
+        "Status",
+        "Prioridade",
+        "Data Produção",
+        "Data Entrega",
+        "Valor",
+        "Progresso",
+      ].join(","),
       ...filteredOrders.map((order) =>
         [
           order.order_number,
@@ -725,7 +773,10 @@ export default function OrdersSupabase() {
     const link = document.createElement("a");
     const url = URL.createObjectURL(blob);
     link.setAttribute("href", url);
-    link.setAttribute("download", `pedidos_${new Date().toISOString().split("T")[0]}.csv`);
+    link.setAttribute(
+      "download",
+      `pedidos_${new Date().toISOString().split("T")[0]}.csv`,
+    );
     link.style.visibility = "hidden";
     document.body.appendChild(link);
     link.click();
@@ -751,8 +802,12 @@ export default function OrdersSupabase() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">Gerenciamento de Pedidos</h1>
-            <p className="text-muted-foreground">Agende e acompanhe seus pedidos de produção</p>
+            <h1 className="text-3xl font-bold text-foreground">
+              Gerenciamento de Pedidos
+            </h1>
+            <p className="text-muted-foreground">
+              Agende e acompanhe seus pedidos de produção
+            </p>
             <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
               <span className="flex items-center gap-1">
                 <Package className="h-4 w-4" />
@@ -767,12 +822,18 @@ export default function OrdersSupabase() {
                 {stats.pendingOrders} pendentes
               </span>
               {stats.urgentOrders > 0 && (
-                <span className="text-red-500">🚨 {stats.urgentOrders} urgentes</span>
+                <span className="text-red-500">
+                  🚨 {stats.urgentOrders} urgentes
+                </span>
               )}
               {stats.overdueOrders > 0 && (
-                <span className="text-red-500">⚠️ {stats.overdueOrders} atrasados</span>
+                <span className="text-red-500">
+                  ⚠️ {stats.overdueOrders} atrasados
+                </span>
               )}
-              {!isConnected && <span className="text-orange-500">📱 Modo offline</span>}
+              {!isConnected && (
+                <span className="text-orange-500">📱 Modo offline</span>
+              )}
             </div>
           </div>
           {checkPermission("orders", "create") && (
@@ -793,8 +854,12 @@ export default function OrdersSupabase() {
               <div className="flex items-center">
                 <Package className="h-8 w-8 text-biobox-green" />
                 <div className="ml-4">
-                  <p className="text-sm font-medium text-muted-foreground">Total de Pedidos</p>
-                  <p className="text-2xl font-bold text-foreground">{stats.totalOrders}</p>
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Total de Pedidos
+                  </p>
+                  <p className="text-2xl font-bold text-foreground">
+                    {stats.totalOrders}
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -805,8 +870,12 @@ export default function OrdersSupabase() {
               <div className="flex items-center">
                 <Clock className="h-8 w-8 text-yellow-500" />
                 <div className="ml-4">
-                  <p className="text-sm font-medium text-muted-foreground">Pendentes</p>
-                  <p className="text-2xl font-bold text-foreground">{stats.pendingOrders}</p>
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Pendentes
+                  </p>
+                  <p className="text-2xl font-bold text-foreground">
+                    {stats.pendingOrders}
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -817,8 +886,12 @@ export default function OrdersSupabase() {
               <div className="flex items-center">
                 <User className="h-8 w-8 text-purple-500" />
                 <div className="ml-4">
-                  <p className="text-sm font-medium text-muted-foreground">Em Produção</p>
-                  <p className="text-2xl font-bold text-foreground">{stats.inProductionOrders}</p>
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Em Produção
+                  </p>
+                  <p className="text-2xl font-bold text-foreground">
+                    {stats.inProductionOrders}
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -829,8 +902,12 @@ export default function OrdersSupabase() {
               <div className="flex items-center">
                 <CheckCircle className="h-8 w-8 text-green-500" />
                 <div className="ml-4">
-                  <p className="text-sm font-medium text-muted-foreground">Prontos</p>
-                  <p className="text-2xl font-bold text-foreground">{stats.readyOrders}</p>
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Prontos
+                  </p>
+                  <p className="text-2xl font-bold text-foreground">
+                    {stats.readyOrders}
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -841,8 +918,12 @@ export default function OrdersSupabase() {
               <div className="flex items-center">
                 <DollarSign className="h-8 w-8 text-biobox-green" />
                 <div className="ml-4">
-                  <p className="text-sm font-medium text-muted-foreground">Receita Total</p>
-                  <p className="text-2xl font-bold text-foreground">{formatCurrency(stats.totalRevenue)}</p>
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Receita Total
+                  </p>
+                  <p className="text-2xl font-bold text-foreground">
+                    {formatCurrency(stats.totalRevenue)}
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -861,35 +942,59 @@ export default function OrdersSupabase() {
             />
           </div>
 
-          <Select value={statusFilter} onValueChange={(value: any) => setStatusFilter(value)}>
+          <Select
+            value={statusFilter}
+            onValueChange={(value: any) => setStatusFilter(value)}
+          >
             <SelectTrigger className="w-48">
               <SelectValue placeholder="Todos os Status" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem key="all" value="all">Todos os Status</SelectItem>
+              <SelectItem key="all" value="all">
+                Todos os Status
+              </SelectItem>
               {Object.entries(statusLabels).map(([key, label]) => (
-                <SelectItem key={key} value={key}>{label}</SelectItem>
+                <SelectItem key={key} value={key}>
+                  {label}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
 
-          <Select value={priorityFilter} onValueChange={(value: any) => setPriorityFilter(value)}>
+          <Select
+            value={priorityFilter}
+            onValueChange={(value: any) => setPriorityFilter(value)}
+          >
             <SelectTrigger className="w-48">
               <SelectValue placeholder="Todas as Prioridades" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem key="all" value="all">Todas as Prioridades</SelectItem>
+              <SelectItem key="all" value="all">
+                Todas as Prioridades
+              </SelectItem>
               {Object.entries(priorityLabels).map(([key, label]) => (
-                <SelectItem key={key} value={key}>{label}</SelectItem>
+                <SelectItem key={key} value={key}>
+                  {label}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
 
-          <Button variant="outline" size="icon" onClick={handleExportReport} title="Exportar Relatório">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={handleExportReport}
+            title="Exportar Relatório"
+          >
             <Download className="h-4 w-4" />
           </Button>
 
-          <Button variant="outline" size="icon" onClick={() => handlePrintOrder(null)} title="Imprimir Lista">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => handlePrintOrder(null)}
+            title="Imprimir Lista"
+          >
             <Printer className="h-4 w-4" />
           </Button>
         </div>
@@ -905,15 +1010,25 @@ export default function OrdersSupabase() {
           <CardContent>
             <Tabs value={activeTab} onValueChange={setActiveTab}>
               <TabsList className="grid w-full grid-cols-6">
-                <TabsTrigger value="all">Todos ({stats.totalOrders})</TabsTrigger>
-                <TabsTrigger value="pending">Pendentes ({stats.pendingOrders})</TabsTrigger>
-                <TabsTrigger value="confirmed">
-                  Confirmados ({orders.filter((o) => o.status === "confirmed").length})
+                <TabsTrigger value="all">
+                  Todos ({stats.totalOrders})
                 </TabsTrigger>
-                <TabsTrigger value="in_production">Em Produção ({stats.inProductionOrders})</TabsTrigger>
-                <TabsTrigger value="ready">Prontos ({stats.readyOrders})</TabsTrigger>
+                <TabsTrigger value="pending">
+                  Pendentes ({stats.pendingOrders})
+                </TabsTrigger>
+                <TabsTrigger value="confirmed">
+                  Confirmados (
+                  {orders.filter((o) => o.status === "confirmed").length})
+                </TabsTrigger>
+                <TabsTrigger value="in_production">
+                  Em Produção ({stats.inProductionOrders})
+                </TabsTrigger>
+                <TabsTrigger value="ready">
+                  Prontos ({stats.readyOrders})
+                </TabsTrigger>
                 <TabsTrigger value="delivered">
-                  Entregues ({orders.filter((o) => o.status === "delivered").length})
+                  Entregues (
+                  {orders.filter((o) => o.status === "delivered").length})
                 </TabsTrigger>
               </TabsList>
 
@@ -936,28 +1051,45 @@ export default function OrdersSupabase() {
                   <TableBody>
                     {paginatedOrders.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={10} className="h-24 text-center text-muted-foreground">
+                        <TableCell
+                          colSpan={10}
+                          className="h-24 text-center text-muted-foreground"
+                        >
                           Nenhum pedido encontrado.
                         </TableCell>
                       </TableRow>
                     ) : (
                       paginatedOrders.map((order) => {
-                        const daysUntilDelivery = getDaysUntilDelivery(order.delivery_date);
+                        const daysUntilDelivery = getDaysUntilDelivery(
+                          order.delivery_date,
+                        );
                         const isOverdue =
                           daysUntilDelivery !== null &&
                           daysUntilDelivery < 0 &&
                           !["delivered", "cancelled"].includes(order.status);
 
                         return (
-                          <TableRow key={order.id} className={isOverdue ? "bg-red-50 dark:bg-red-950/20" : ""}>
+                          <TableRow
+                            key={order.id}
+                            className={
+                              isOverdue ? "bg-red-50 dark:bg-red-950/20" : ""
+                            }
+                          >
                             <TableCell>
                               <div className="flex items-center space-x-2">
-                                <div className={`w-2 h-2 rounded-full ${priorityColors[order.priority]}`} />
+                                <div
+                                  className={`w-2 h-2 rounded-full ${priorityColors[order.priority]}`}
+                                />
                                 <div>
                                   <div className="font-medium flex items-center gap-2">
                                     {order.order_number}
                                     {order.is_fragmented && (
-                                      <Badge variant="outline" className="text-xs">Fragmentado</Badge>
+                                      <Badge
+                                        variant="outline"
+                                        className="text-xs"
+                                      >
+                                        Fragmentado
+                                      </Badge>
                                     )}
                                   </div>
                                   {order.assigned_operator && (
@@ -971,22 +1103,34 @@ export default function OrdersSupabase() {
                             </TableCell>
                             <TableCell>
                               <div>
-                                <div className="font-medium">{order.customer_name}</div>
-                                <div className="text-xs text-muted-foreground">{order.customer_phone}</div>
+                                <div className="font-medium">
+                                  {order.customer_name}
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                  {order.customer_phone}
+                                </div>
                               </div>
                             </TableCell>
                             <TableCell>
                               <div>
-                                <div className="font-medium text-biobox-green">{order.seller_name}</div>
-                                <div className="text-xs text-muted-foreground">Vendedor</div>
+                                <div className="font-medium text-biobox-green">
+                                  {order.seller_name}
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                  Vendedor
+                                </div>
                               </div>
                             </TableCell>
                             <TableCell>
-                              <div className="text-sm">{formatDate(order.scheduled_date)}</div>
+                              <div className="text-sm">
+                                {formatDate(order.scheduled_date)}
+                              </div>
                             </TableCell>
                             <TableCell>
                               <div className="text-sm">
-                                {order.delivery_date ? formatDate(order.delivery_date) : "-"}
+                                {order.delivery_date
+                                  ? formatDate(order.delivery_date)
+                                  : "-"}
                                 {daysUntilDelivery !== null && (
                                   <div
                                     className={`text-xs ${isOverdue ? "text-red-500" : daysUntilDelivery <= 3 ? "text-orange-500" : "text-muted-foreground"}`}
@@ -1007,32 +1151,52 @@ export default function OrdersSupabase() {
                                 <div className="w-full bg-gray-200 rounded-full h-2">
                                   <div
                                     className="bg-biobox-green h-2 rounded-full"
-                                    style={{ width: `${order.production_progress}%` }}
+                                    style={{
+                                      width: `${order.production_progress}%`,
+                                    }}
                                   ></div>
                                 </div>
-                                <span className="text-xs text-muted-foreground">{order.production_progress}%</span>
+                                <span className="text-xs text-muted-foreground">
+                                  {order.production_progress}%
+                                </span>
                               </div>
                             </TableCell>
                             <TableCell>
-                              <Badge className={statusColors[order.status]}>{statusLabels[order.status]}</Badge>
+                              <Badge className={statusColors[order.status]}>
+                                {statusLabels[order.status]}
+                              </Badge>
                             </TableCell>
                             <TableCell>
-                              <Badge className={priorityColors[order.priority]}>{priorityLabels[order.priority]}</Badge>
+                              <Badge className={priorityColors[order.priority]}>
+                                {priorityLabels[order.priority]}
+                              </Badge>
                             </TableCell>
-                            <TableCell className="font-medium">{formatCurrency(order.total_amount)}</TableCell>
+                            <TableCell className="font-medium">
+                              {formatCurrency(order.total_amount)}
+                            </TableCell>
                             <TableCell>
                               <div className="flex items-center space-x-2">
                                 {/* Botão Ver Detalhes */}
-                                <Button variant="ghost" size="icon" onClick={() => handleViewOrder(order)} title="Ver detalhes">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleViewOrder(order)}
+                                  title="Ver detalhes"
+                                >
                                   <Eye className="h-4 w-4" />
                                 </Button>
 
                                 {/* Mudanças Rápidas de Status */}
-                                <QuickStatusChange order={order} onTransition={handleTransition} />
+                                <QuickStatusChange
+                                  order={order}
+                                  onTransition={handleTransition}
+                                />
 
                                 {/* Botão Fragmentar */}
                                 {checkPermission("orders", "edit") &&
-                                  !["delivered", "cancelled"].includes(order.status) && (
+                                  !["delivered", "cancelled"].includes(
+                                    order.status,
+                                  ) && (
                                     <Button
                                       variant="outline"
                                       size="sm"
@@ -1100,16 +1264,24 @@ export default function OrdersSupabase() {
                 </Table>
                 <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <p className="text-sm text-muted-foreground">
-                    Mostrando {hasOrders ? `${rangeStart}–${rangeEnd}` : "0"} de {filteredOrders.length} pedidos
+                    Mostrando {hasOrders ? `${rangeStart}–${rangeEnd}` : "0"} de{" "}
+                    {filteredOrders.length} pedidos
                   </p>
                   <div className="flex items-center gap-2">
-                    <Button variant="outline" size="sm" onClick={() => setCurrentPage(1)} disabled={currentPage === 1}>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(1)}
+                      disabled={currentPage === 1}
+                    >
                       <ChevronsLeft className="h-4 w-4" />
                     </Button>
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                      onClick={() =>
+                        setCurrentPage((prev) => Math.max(1, prev - 1))
+                      }
                       disabled={currentPage === 1}
                     >
                       <ChevronLeft className="h-4 w-4" />
@@ -1120,7 +1292,9 @@ export default function OrdersSupabase() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setCurrentPage((prev) => Math.min(pageCount, prev + 1))}
+                      onClick={() =>
+                        setCurrentPage((prev) => Math.min(pageCount, prev + 1))
+                      }
                       disabled={currentPage === pageCount || !hasOrders}
                     >
                       <ChevronRight className="h-4 w-4" />
@@ -1144,16 +1318,24 @@ export default function OrdersSupabase() {
         <Dialog open={showOrderDetails} onOpenChange={setShowOrderDetails}>
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Detalhes do Pedido {selectedOrder?.order_number}</DialogTitle>
-              <DialogDescription>Visualize e gerencie as informações completas do pedido</DialogDescription>
+              <DialogTitle>
+                Detalhes do Pedido {selectedOrder?.order_number}
+              </DialogTitle>
+              <DialogDescription>
+                Visualize e gerencie as informações completas do pedido
+              </DialogDescription>
             </DialogHeader>
             {selectedOrder && (
               <div className="space-y-6">
                 {/* Cabeçalho com Status e Ações Rápidas */}
                 <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
                   <div className="flex items-center gap-4">
-                    <Badge className={statusColors[selectedOrder.status]}>{statusLabels[selectedOrder.status]}</Badge>
-                    <Badge className={priorityColors[selectedOrder.priority]}>{priorityLabels[selectedOrder.priority]}</Badge>
+                    <Badge className={statusColors[selectedOrder.status]}>
+                      {statusLabels[selectedOrder.status]}
+                    </Badge>
+                    <Badge className={priorityColors[selectedOrder.priority]}>
+                      {priorityLabels[selectedOrder.priority]}
+                    </Badge>
                     {selectedOrder.is_fragmented && (
                       <Badge variant="outline">
                         <Scissors className="h-3 w-3 mr-1" />
@@ -1161,36 +1343,53 @@ export default function OrdersSupabase() {
                       </Badge>
                     )}
                   </div>
-                  <QuickStatusChange order={selectedOrder} onTransition={handleTransition} />
+                  <QuickStatusChange
+                    order={selectedOrder}
+                    onTransition={handleTransition}
+                  />
                 </div>
 
                 {/* Informações do Cliente e Pedido */}
                 <div className="grid grid-cols-2 gap-4">
                   <Card>
                     <CardHeader>
-                      <CardTitle className="text-base">Informações do Cliente</CardTitle>
+                      <CardTitle className="text-base">
+                        Informações do Cliente
+                      </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-2">
                       <div className="flex items-start gap-2">
                         <User className="h-4 w-4 text-muted-foreground mt-0.5" />
                         <div>
-                          <p className="font-medium">{selectedOrder.customer_name}</p>
-                          <p className="text-sm text-muted-foreground">Cliente</p>
+                          <p className="font-medium">
+                            {selectedOrder.customer_name}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            Cliente
+                          </p>
                         </div>
                       </div>
                       <div className="flex items-start gap-2">
                         <Phone className="h-4 w-4 text-muted-foreground mt-0.5" />
                         <div>
-                          <p className="font-medium">{selectedOrder.customer_phone}</p>
-                          <p className="text-sm text-muted-foreground">Telefone</p>
+                          <p className="font-medium">
+                            {selectedOrder.customer_phone}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            Telefone
+                          </p>
                         </div>
                       </div>
                       {selectedOrder.customer_email && (
                         <div className="flex items-start gap-2">
                           <Mail className="h-4 w-4 text-muted-foreground mt-0.5" />
                           <div>
-                            <p className="font-medium">{selectedOrder.customer_email}</p>
-                            <p className="text-sm text-muted-foreground">E-mail</p>
+                            <p className="font-medium">
+                              {selectedOrder.customer_email}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              E-mail
+                            </p>
                           </div>
                         </div>
                       )}
@@ -1199,30 +1398,44 @@ export default function OrdersSupabase() {
 
                   <Card>
                     <CardHeader>
-                      <CardTitle className="text-base">Informações do Pedido</CardTitle>
+                      <CardTitle className="text-base">
+                        Informações do Pedido
+                      </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-2">
                       <div className="flex items-start gap-2">
                         <User className="h-4 w-4 text-muted-foreground mt-0.5" />
                         <div>
-                          <p className="font-medium">{selectedOrder.seller_name}</p>
-                          <p className="text-sm text-muted-foreground">Vendedor</p>
+                          <p className="font-medium">
+                            {selectedOrder.seller_name}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            Vendedor
+                          </p>
                         </div>
                       </div>
                       {selectedOrder.assigned_operator && (
                         <div className="flex items-start gap-2">
                           <User className="h-4 w-4 text-muted-foreground mt-0.5" />
                           <div>
-                            <p className="font-medium">{selectedOrder.assigned_operator}</p>
-                            <p className="text-sm text-muted-foreground">Operador</p>
+                            <p className="font-medium">
+                              {selectedOrder.assigned_operator}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              Operador
+                            </p>
                           </div>
                         </div>
                       )}
                       <div className="flex items-start gap-2">
                         <Clock className="h-4 w-4 text-muted-foreground mt-0.5" />
                         <div>
-                          <p className="font-medium">{selectedOrder.production_progress}%</p>
-                          <p className="text-sm text-muted-foreground">Progresso</p>
+                          <p className="font-medium">
+                            {selectedOrder.production_progress}%
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            Progresso
+                          </p>
                         </div>
                       </div>
                     </CardContent>
@@ -1237,17 +1450,29 @@ export default function OrdersSupabase() {
                   <CardContent>
                     <div className="grid grid-cols-3 gap-4">
                       <div>
-                        <p className="text-sm text-muted-foreground mb-1">Criado em</p>
-                        <p className="font-medium">{formatDate(selectedOrder.created_at)}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground mb-1">Produção</p>
-                        <p className="font-medium">{formatDate(selectedOrder.scheduled_date)}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground mb-1">Entrega</p>
+                        <p className="text-sm text-muted-foreground mb-1">
+                          Criado em
+                        </p>
                         <p className="font-medium">
-                          {selectedOrder.delivery_date ? formatDate(selectedOrder.delivery_date) : "Não definida"}
+                          {formatDate(selectedOrder.created_at)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground mb-1">
+                          Produção
+                        </p>
+                        <p className="font-medium">
+                          {formatDate(selectedOrder.scheduled_date)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground mb-1">
+                          Entrega
+                        </p>
+                        <p className="font-medium">
+                          {selectedOrder.delivery_date
+                            ? formatDate(selectedOrder.delivery_date)
+                            : "Não definida"}
                         </p>
                       </div>
                     </div>
@@ -1255,64 +1480,105 @@ export default function OrdersSupabase() {
                 </Card>
 
                 {/* Produtos */}
-                {selectedOrder.products && selectedOrder.products.length > 0 && (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-base">Produtos</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-2">
-                        {selectedOrder.products.map((product, index) => (
-                          <div key={index} className="flex justify-between items-start p-3 bg-muted/50 rounded-lg">
-                            <div>
-                              <p className="font-medium">{product.product_name || "Produto"}</p>
-                              <p className="text-sm text-muted-foreground">
-                                {[product.model, product.size, product.color, product.fabric].filter(Boolean).join(" • ")}
-                              </p>
+                {selectedOrder.products &&
+                  selectedOrder.products.length > 0 && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-base">Produtos</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-2">
+                          {selectedOrder.products.map((product, index) => (
+                            <div
+                              key={index}
+                              className="flex justify-between items-start p-3 bg-muted/50 rounded-lg"
+                            >
+                              <div>
+                                <p className="font-medium">
+                                  {product.product_name || "Produto"}
+                                </p>
+                                <p className="text-sm text-muted-foreground">
+                                  {[
+                                    product.model,
+                                    product.size,
+                                    product.color,
+                                    product.fabric,
+                                  ]
+                                    .filter(Boolean)
+                                    .join(" • ")}
+                                </p>
+                              </div>
+                              <div className="text-right">
+                                <p className="font-medium">
+                                  {product.quantity}x{" "}
+                                  {formatCurrency(product.unit_price)}
+                                </p>
+                                <p className="text-sm text-muted-foreground">
+                                  {formatCurrency(product.total_price)}
+                                </p>
+                              </div>
                             </div>
-                            <div className="text-right">
-                              <p className="font-medium">
-                                {product.quantity}x {formatCurrency(product.unit_price)}
-                              </p>
-                              <p className="text-sm text-muted-foreground">{formatCurrency(product.total_price)}</p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
 
                 {/* Fragmentos */}
-                {selectedOrder.fragments && selectedOrder.fragments.length > 0 && (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-base">Fragmentação de Produção</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-2">
-                        {selectedOrder.fragments.map((fragment) => (
-                          <div key={fragment.id} className="border rounded-lg p-3">
-                            <div className="flex items-center justify-between mb-2">
-                              <span className="font-medium">
-                                Fragmento {fragment.fragment_number} · {fragment.quantity} unidade(s)
-                              </span>
-                              <Badge className={fragmentStatusColors[fragment.status] || fragmentStatusColors.pending}>
-                                {fragmentStatusLabels[fragment.status]}
-                              </Badge>
+                {selectedOrder.fragments &&
+                  selectedOrder.fragments.length > 0 && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-base">
+                          Fragmentação de Produção
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-2">
+                          {selectedOrder.fragments.map((fragment) => (
+                            <div
+                              key={fragment.id}
+                              className="border rounded-lg p-3"
+                            >
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="font-medium">
+                                  Fragmento {fragment.fragment_number} ·{" "}
+                                  {fragment.quantity} unidade(s)
+                                </span>
+                                <Badge
+                                  className={
+                                    fragmentStatusColors[fragment.status] ||
+                                    fragmentStatusColors.pending
+                                  }
+                                >
+                                  {fragmentStatusLabels[fragment.status]}
+                                </Badge>
+                              </div>
+                              <div className="grid grid-cols-2 gap-2 text-sm text-muted-foreground">
+                                <span>
+                                  Produção:{" "}
+                                  {formatDate(fragment.scheduled_date as any)}
+                                </span>
+                                {fragment.value > 0 && (
+                                  <span>
+                                    Valor: {formatCurrency(fragment.value)}
+                                  </span>
+                                )}
+                                <span>
+                                  Progresso: {fragment.progress ?? 0}%
+                                </span>
+                                {fragment.assigned_operator && (
+                                  <span>
+                                    Operador: {fragment.assigned_operator}
+                                  </span>
+                                )}
+                              </div>
                             </div>
-                            <div className="grid grid-cols-2 gap-2 text-sm text-muted-foreground">
-                              <span>Produção: {formatDate(fragment.scheduled_date as any)}</span>
-                              {fragment.value > 0 && <span>Valor: {formatCurrency(fragment.value)}</span>}
-                              <span>Progresso: {fragment.progress ?? 0}%</span>
-                              {fragment.assigned_operator && <span>Operador: {fragment.assigned_operator}</span>}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
 
                 {/* Observações */}
                 {selectedOrder.notes && (
@@ -1321,7 +1587,9 @@ export default function OrdersSupabase() {
                       <CardTitle className="text-base">Observações</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <p className="text-sm whitespace-pre-wrap">{selectedOrder.notes}</p>
+                      <p className="text-sm whitespace-pre-wrap">
+                        {selectedOrder.notes}
+                      </p>
                     </CardContent>
                   </Card>
                 )}
@@ -1329,37 +1597,54 @@ export default function OrdersSupabase() {
                 {/* Resumo Financeiro */}
                 <div className="flex justify-between items-center p-4 bg-biobox-green/10 border border-biobox-green/20 rounded-lg">
                   <div>
-                    <p className="text-sm text-muted-foreground">Total do Pedido</p>
-                    <p className="text-2xl font-bold text-biobox-green">{formatCurrency(selectedOrder.total_amount)}</p>
+                    <p className="text-sm text-muted-foreground">
+                      Total do Pedido
+                    </p>
+                    <p className="text-2xl font-bold text-biobox-green">
+                      {formatCurrency(selectedOrder.total_amount)}
+                    </p>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm text-muted-foreground">Quantidade Total</p>
-                    <p className="text-2xl font-bold">{selectedOrder.total_quantity}</p>
+                    <p className="text-sm text-muted-foreground">
+                      Quantidade Total
+                    </p>
+                    <p className="text-2xl font-bold">
+                      {selectedOrder.total_quantity}
+                    </p>
                   </div>
                 </div>
 
                 {/* Ações */}
                 <div className="flex justify-end gap-2 pt-4 border-t">
-                  {checkPermission("orders", "edit") && !["delivered", "cancelled"].includes(selectedOrder.status) && (
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        setShowOrderDetails(false);
-                        openFragmentForm(selectedOrder);
-                      }}
-                    >
-                      <Scissors className="h-4 w-4 mr-2" />
-                      Fragmentar Produção
-                    </Button>
-                  )}
+                  {checkPermission("orders", "edit") &&
+                    !["delivered", "cancelled"].includes(
+                      selectedOrder.status,
+                    ) && (
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setShowOrderDetails(false);
+                          openFragmentForm(selectedOrder);
+                        }}
+                      >
+                        <Scissors className="h-4 w-4 mr-2" />
+                        Fragmentar Produç��o
+                      </Button>
+                    )}
 
-                  <Button variant="outline" onClick={() => handlePrintOrder(selectedOrder)}>
+                  <Button
+                    variant="outline"
+                    onClick={() => handlePrintOrder(selectedOrder)}
+                  >
                     <Printer className="h-4 w-4 mr-2" />
                     Imprimir
                   </Button>
 
                   {checkPermission("orders", "edit") && (
-                    <Button className="bg-biobox-green hover:bg-biobox-green-dark" onClick={() => handleEditOrder(selectedOrder)}>
+                    <Button
+                      className="bg-biobox-green hover:bg-biobox-green-dark"
+                      onClick={() => handleEditOrder(selectedOrder)}
+                    >
                       <Edit className="h-4 w-4 mr-2" />
                       Editar Pedido
                     </Button>
@@ -1401,12 +1686,19 @@ export default function OrdersSupabase() {
         </Dialog>
 
         {/* New Order Form */}
-        <NewOrderForm open={showNewOrderForm} onOpenChange={setShowNewOrderForm} onOrderCreated={handleOrderCreated} />
+        <NewOrderForm
+          open={showNewOrderForm}
+          onOpenChange={setShowNewOrderForm}
+          onOrderCreated={handleOrderCreated}
+        />
 
         {/* Fragment Form */}
         {showFragmentForm && fragmentTarget && (
           <OrderFragmentForm
-            totalQuantity={Math.max(1, resolveFragmentTotalQuantity(fragmentTarget, fragmentInitial))}
+            totalQuantity={Math.max(
+              1,
+              resolveFragmentTotalQuantity(fragmentTarget, fragmentInitial),
+            )}
             totalValue={toNumber(fragmentTarget.total_amount)}
             orderId={fragmentTarget.id}
             initialFragments={fragmentInitial}

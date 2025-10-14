@@ -350,32 +350,40 @@ export function useSupabase() {
       products: orderData.products || [],
     };
 
+    // Try Firestore first, but robustly fallback to localStorage on any failure
     if (isConnected && db) {
-      const ref = await addDoc(
-        collection(db, "orders"),
-        sanitizeForFirestore({
+      try {
+        const ref = await addDoc(
+          collection(db, "orders"),
+          sanitizeForFirestore({
+            ...dataToSave,
+            created_at: serverTimestamp(),
+            updated_at: serverTimestamp(),
+          }),
+        );
+        const saved: Order = {
           ...dataToSave,
-          created_at: serverTimestamp(),
-          updated_at: serverTimestamp(),
-        }),
-      );
-      const saved: Order = {
-        ...dataToSave,
-        id: ref.id,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      } as Order;
-      await logActivity({
-        userId: user?.id,
-        userName: user?.name || "",
-        actionType: "create",
-        entityType: "order",
-        entityId: saved.id,
-        entityName: saved.order_number,
-        description: `Pedido ${saved.order_number} criado por ${user?.name}`,
-        metadata: { seller_id: saved.seller_id },
-      });
-      return saved;
+          id: ref.id,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        } as Order;
+        await logActivity({
+          userId: user?.id,
+          userName: user?.name || "",
+          actionType: "create",
+          entityType: "order",
+          entityId: saved.id,
+          entityName: saved.order_number,
+          description: `Pedido ${saved.order_number} criado por ${user?.name}`,
+          metadata: { seller_id: saved.seller_id },
+        });
+        return saved;
+      } catch (err) {
+        console.warn(
+          "createOrder: Firestore unavailable, falling back to localStorage:",
+          err,
+        );
+      }
     }
 
     const orders = await getOrders();
@@ -405,23 +413,30 @@ export function useSupabase() {
   ): Promise<Order | null> => {
     const now = new Date().toISOString();
     if (isConnected && db) {
-      await updateDoc(
-        doc(db, "orders", orderId),
-        sanitizeForFirestore({
-          ...updates,
-          updated_at: serverTimestamp(),
-        }) as any,
-      );
-      const snap = await getDoc(doc(db, "orders", orderId));
-      const data = snap.data() as any;
-      const created = (data.created_at?.toDate?.() as Date) || new Date();
-      const updated = (data.updated_at?.toDate?.() as Date) || new Date();
-      return {
-        id: snap.id,
-        ...data,
-        created_at: created.toISOString(),
-        updated_at: updated.toISOString(),
-      } as Order;
+      try {
+        await updateDoc(
+          doc(db, "orders", orderId),
+          sanitizeForFirestore({
+            ...updates,
+            updated_at: serverTimestamp(),
+          }) as any,
+        );
+        const snap = await getDoc(doc(db, "orders", orderId));
+        const data = snap.data() as any;
+        const created = (data.created_at?.toDate?.() as Date) || new Date();
+        const updated = (data.updated_at?.toDate?.() as Date) || new Date();
+        return {
+          id: snap.id,
+          ...data,
+          created_at: created.toISOString(),
+          updated_at: updated.toISOString(),
+        } as Order;
+      } catch (err) {
+        console.warn(
+          "updateOrder: Firestore unavailable, falling back to localStorage:",
+          err,
+        );
+      }
     }
 
     const orders = await getOrders();
@@ -437,25 +452,30 @@ export function useSupabase() {
       console.log("🗑️ Deletando pedido:", orderId);
 
       if (isConnected && db) {
-        await deleteDoc(doc(db, "orders", orderId));
-        console.log("✅ Pedido deletado do Firebase");
+        try {
+          await deleteDoc(doc(db, "orders", orderId));
+          console.log("✅ Pedido deletado do Firebase");
 
-        // Log de atividade
-        await logActivity({
-          userId: user?.id,
-          userName: user?.name || "",
-          actionType: "delete",
-          entityType: "order",
-          entityId: orderId,
-          entityName: orderId,
-          description: `Pedido ${orderId} excluído por ${user?.name}`,
-          metadata: {},
-        });
+          await logActivity({
+            userId: user?.id,
+            userName: user?.name || "",
+            actionType: "delete",
+            entityType: "order",
+            entityId: orderId,
+            entityName: orderId,
+            description: `Pedido ${orderId} excluído por ${user?.name}`,
+            metadata: {},
+          });
 
-        return true;
+          return true;
+        } catch (err) {
+          console.warn(
+            "deleteOrder: Firestore unavailable, falling back to localStorage:",
+            err,
+          );
+        }
       }
 
-      // Fallback para localStorage
       const orders = await getOrders();
       const filtered = orders.filter((o) => o.id !== orderId);
       localStorage.setItem("biobox_orders", JSON.stringify(filtered));

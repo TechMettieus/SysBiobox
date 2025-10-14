@@ -23,6 +23,7 @@ import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useSupabase } from "@/hooks/useSupabase";
+import { useLocation, useSearchParams } from "react-router-dom";
 
 interface ProductionDashboardProps {
   tasks?: ProductionTask[];
@@ -243,6 +244,8 @@ export default function ProductionDashboard({
   const [storedTasks, setStoredTasks] = useState<StoredTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedTask, setSelectedTask] = useState<EnrichedTask | null>(null);
+  const [searchParams] = useSearchParams();
+  const location = useLocation();
 
   const loadStoredTasks = useCallback(() => {
     if (typeof window === "undefined") {
@@ -440,6 +443,21 @@ export default function ProductionDashboard({
       return;
     }
 
+    const preferredOrderId =
+      searchParams.get("orderId") || (location.state as any)?.orderId || null;
+
+    if (preferredOrderId) {
+      const preferred = mergedTasks.find(
+        (task) =>
+          task.orderId === preferredOrderId ||
+          task.id === `task-${preferredOrderId}`,
+      );
+      if (preferred) {
+        setSelectedTask(preferred);
+        return;
+      }
+    }
+
     setSelectedTask((current) => {
       if (!current) {
         return mergedTasks[0];
@@ -447,7 +465,7 @@ export default function ProductionDashboard({
       const updated = mergedTasks.find((task) => task.id === current.id);
       return updated ?? mergedTasks[0];
     });
-  }, [mergedTasks]);
+  }, [mergedTasks, searchParams, location.state]);
 
   const taskStats = useMemo(() => {
     const active = mergedTasks.filter(
