@@ -83,12 +83,11 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           {/* Logo */}
           <div className="flex h-16 items-center justify-between px-6 border-b border-sidebar-border">
             <div className="flex items-center space-x-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-biobox-green">
-                <span className="text-xs font-bold text-biobox-dark">BB</span>
-              </div>
-              <span className="text-lg font-semibold text-sidebar-foreground">
-                BioBoxsys
-              </span>
+              <img 
+                src="/logobio.png" 
+                alt="BioBox" 
+                className="h-10 w-auto object-contain"
+              />
             </div>
             <Button
               variant="ghost"
@@ -158,24 +157,20 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
       {/* Main content */}
       <div className="lg:pl-64">
-        {/* Top header */}
-        <header className="bg-card border-b border-border">
-          <div className="flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
-            <div className="flex items-center space-x-4">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="lg:hidden"
-                onClick={() => setSidebarOpen(true)}
-              >
-                <Menu className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        </header>
+        {/* Mobile menu button */}
+        <div className="lg:hidden fixed top-4 left-4 z-30">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setSidebarOpen(true)}
+            className="bg-card border border-border"
+          >
+            <Menu className="h-4 w-4" />
+          </Button>
+        </div>
 
         {/* Page content */}
-        <main className="p-4 sm:p-6 lg:p-8">{children}</main>
+        <main className="p-6 lg:p-8">{children}</main>
       </div>
     </div>
   );

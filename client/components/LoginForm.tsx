@@ -43,14 +43,13 @@ export default function LoginForm() {
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md bg-card border-border">
         <CardHeader className="text-center">
-          <div className="flex justify-center mb-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-biobox-green">
-              <span className="text-lg font-bold text-biobox-dark">BB</span>
-            </div>
+          <div className="flex justify-center mb-6">
+            <img 
+              src="/logobio.png" 
+              alt="BioBox" 
+              className="h-20 w-auto object-contain"
+            />
           </div>
-          <CardTitle className="text-2xl font-bold text-foreground">
-            BioBoxsys
-          </CardTitle>
           <p className="text-muted-foreground">
             Sistema de Gerenciamento de Produção
           </p>
