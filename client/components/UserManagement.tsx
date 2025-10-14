@@ -248,53 +248,76 @@ export default function UserManagement() {
 
         // Criar no Firebase Auth em um app secundário para não afetar a sessão atual
         if (isFirebaseConfigured) {
-          try {
-            const { initializeApp: initializeFirebaseApp, deleteApp } = await import("firebase/app");
-            const secondary = initializeFirebaseApp(
-              (app as any).options,
-              `auth-create-${Date.now()}`,
-            );
-            const secondaryAuth = getAuth(secondary);
-
-            const userCredential = await createUserWithEmailAndPassword(
-              secondaryAuth,
-              formData.email.trim().toLowerCase(),
-              formData.password,
-            );
-            userId = userCredential.user.uid;
-            createdInAuth = true;
-
-            try {
-              await updateProfile(userCredential.user, {
-                displayName: formData.name.trim(),
-              });
-            } catch {}
-
-            await signOut(secondaryAuth);
-            await deleteApp(secondary);
-
-            toast({
-              title: "Conta criada no Firebase Auth",
-              description: "Usuário autenticado criado com sucesso",
-            });
-          } catch (error: any) {
-            console.error("Erro no Firebase Auth:", error);
-
-            if (error.code === "auth/email-already-in-use") {
-              toast({
-                title: "Email já cadastrado",
-                description: "Este email já está sendo usado por outro usuário",
-                variant: "destructive",
-              });
-              return;
-            }
-
+          // If offline, skip Firebase Auth to avoid network errors
+          if (typeof window !== "undefined" && !navigator.onLine) {
+            console.warn("Offline: skipping Firebase Auth user creation");
             userId = `user-${Date.now()}`;
             toast({
-              title: "Aviso",
-              description: "Usuário criado sem autenticação Firebase",
+              title: "Sem conexão",
+              description:
+                "Sem conexão com a internet. Usuário criado sem autenticação Firebase",
               variant: "destructive",
             });
+          } else {
+            try {
+              const { initializeApp: initializeFirebaseApp, deleteApp } = await import(
+                "firebase/app"
+              );
+              const secondary = initializeFirebaseApp(
+                (app as any).options,
+                `auth-create-${Date.now()}`,
+              );
+              const secondaryAuth = getAuth(secondary);
+
+              const userCredential = await createUserWithEmailAndPassword(
+                secondaryAuth,
+                formData.email.trim().toLowerCase(),
+                formData.password,
+              );
+              userId = userCredential.user.uid;
+              createdInAuth = true;
+
+              try {
+                await updateProfile(userCredential.user, {
+                  displayName: formData.name.trim(),
+                });
+              } catch {}
+
+              await signOut(secondaryAuth);
+              await deleteApp(secondary);
+
+              toast({
+                title: "Conta criada no Firebase Auth",
+                description: "Usuário autenticado criado com sucesso",
+              });
+            } catch (error: any) {
+              console.error("Erro no Firebase Auth:", error);
+
+              // Specific handling for common network error
+              if (error.code === "auth/network-request-failed") {
+                userId = `user-${Date.now()}`;
+                toast({
+                  title: "Erro de rede no Firebase",
+                  description:
+                    "Não foi possível conectar ao Firebase. Usuário criado sem autenticação Firebase",
+                  variant: "destructive",
+                });
+              } else if (error.code === "auth/email-already-in-use") {
+                toast({
+                  title: "Email já cadastrado",
+                  description: "Este email já está sendo usado por outro usuário",
+                  variant: "destructive",
+                });
+                return;
+              } else {
+                userId = `user-${Date.now()}`;
+                toast({
+                  title: "Aviso",
+                  description: "Usuário criado sem autenticação Firebase",
+                  variant: "destructive",
+                });
+              }
+            }
           }
         } else {
           userId = `user-${Date.now()}`;
