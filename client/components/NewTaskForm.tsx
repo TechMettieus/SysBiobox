@@ -10,7 +10,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Badge } from "@/components/ui/badge";
 import { X, Save, Calendar as CalendarIcon, User, Package, Clock } from "lucide-react";
 import { ProductionTask, productionStages } from "@/types/production";
-import { useSupabase, Order } from "@/hooks/useSupabase";
+import { useFirebase, Order } from "@/hooks/useFirebase";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -31,7 +31,7 @@ export default function NewTaskForm({ onSave, onCancel }: NewTaskFormProps) {
   const [showCalendar, setShowCalendar] = useState(false);
   const [availableOrders, setAvailableOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
-  const { getOrders } = useSupabase();
+  const { getOrders } = useFirebase();
 
   useEffect(() => {
     loadOrders();
