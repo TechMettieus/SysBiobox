@@ -18,17 +18,22 @@ function isIgnoredMessage(msg?: unknown) {
 
 if (typeof window !== "undefined") {
   // Prevent the error event from propagating when it matches our ignore list
-  window.addEventListener("error", (event: ErrorEvent) => {
-    const message = event.message || (event.error && (event.error as any).message);
-    if (isIgnoredMessage(message)) {
-      try {
-        event.stopImmediatePropagation?.();
-      } catch {}
-      try {
-        event.preventDefault?.();
-      } catch {}
-    }
-  }, true);
+  window.addEventListener(
+    "error",
+    (event: ErrorEvent) => {
+      const message =
+        event.message || (event.error && (event.error as any).message);
+      if (isIgnoredMessage(message)) {
+        try {
+          event.stopImmediatePropagation?.();
+        } catch {}
+        try {
+          event.preventDefault?.();
+        } catch {}
+      }
+    },
+    true,
+  );
 
   // Patch console.error to avoid noisy logs in devtools
   try {

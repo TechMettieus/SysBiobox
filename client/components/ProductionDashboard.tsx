@@ -448,7 +448,9 @@ export default function ProductionDashboard({
 
     if (preferredOrderId) {
       const preferred = mergedTasks.find(
-        (task) => task.orderId === preferredOrderId || task.id === `task-${preferredOrderId}`,
+        (task) =>
+          task.orderId === preferredOrderId ||
+          task.id === `task-${preferredOrderId}`,
       );
       if (preferred) {
         setSelectedTask(preferred);

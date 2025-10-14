@@ -379,7 +379,10 @@ export function useSupabase() {
         });
         return saved;
       } catch (err) {
-        console.warn("createOrder: Firestore unavailable, falling back to localStorage:", err);
+        console.warn(
+          "createOrder: Firestore unavailable, falling back to localStorage:",
+          err,
+        );
       }
     }
 
@@ -429,7 +432,10 @@ export function useSupabase() {
           updated_at: updated.toISOString(),
         } as Order;
       } catch (err) {
-        console.warn("updateOrder: Firestore unavailable, falling back to localStorage:", err);
+        console.warn(
+          "updateOrder: Firestore unavailable, falling back to localStorage:",
+          err,
+        );
       }
     }
 
@@ -463,7 +469,10 @@ export function useSupabase() {
 
           return true;
         } catch (err) {
-          console.warn("deleteOrder: Firestore unavailable, falling back to localStorage:", err);
+          console.warn(
+            "deleteOrder: Firestore unavailable, falling back to localStorage:",
+            err,
+          );
         }
       }
 
