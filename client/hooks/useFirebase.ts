@@ -133,7 +133,7 @@ export interface OrderProduct {
   created_at: string;
 }
 
-export function useSupabase() {
+export function useFirebase() {
   const [isConnected, setIsConnected] = useState(false);
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
@@ -156,7 +156,7 @@ export function useSupabase() {
           "in_production",
           "in_production",
           "em_producao",
-          "em_produção",
+          "em produção",
           "producing",
         ].includes(v)
       )
@@ -770,7 +770,7 @@ export function useSupabase() {
     getOrders,
     createOrder,
     updateOrder,
-    deleteOrder, // ← FUNÇÃO ADICIONADA NA EXPORTAÇÃO
+    deleteOrder,
     createProduct,
     updateProduct,
     deleteProduct,

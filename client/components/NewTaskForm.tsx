@@ -3,14 +3,31 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
-import { X, Save, Calendar as CalendarIcon, User, Package, Clock } from "lucide-react";
+import {
+  X,
+  Save,
+  Calendar as CalendarIcon,
+  User,
+  Package,
+  Clock,
+} from "lucide-react";
 import { ProductionTask, productionStages } from "@/types/production";
-import { useSupabase, Order } from "@/hooks/useSupabase";
+import { useFirebase, Order } from "@/hooks/useFirebase";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -21,17 +38,17 @@ interface NewTaskFormProps {
 
 export default function NewTaskForm({ onSave, onCancel }: NewTaskFormProps) {
   const [formData, setFormData] = useState({
-    orderId: '',
-    stage: '',
-    priority: 'medium' as ProductionTask['priority'],
-    assignedOperator: '',
+    orderId: "",
+    stage: "",
+    priority: "medium" as ProductionTask["priority"],
+    assignedOperator: "",
     estimatedCompletionTime: new Date(),
-    notes: ''
+    notes: "",
   });
   const [showCalendar, setShowCalendar] = useState(false);
   const [availableOrders, setAvailableOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
-  const { getOrders } = useSupabase();
+  const { getOrders } = useFirebase();
 
   useEffect(() => {
     loadOrders();
@@ -41,38 +58,42 @@ export default function NewTaskForm({ onSave, onCancel }: NewTaskFormProps) {
     try {
       setLoading(true);
       const orders = await getOrders();
-      const filtered = orders.filter(order =>
-        ['confirmed', 'in_production'].includes(order.status)
+      const filtered = orders.filter((order) =>
+        ["confirmed", "in_production"].includes(order.status),
       );
       setAvailableOrders(filtered);
     } catch (error) {
-      console.error('Erro ao carregar pedidos:', error);
+      console.error("Erro ao carregar pedidos:", error);
     } finally {
       setLoading(false);
     }
   };
 
-  const selectedOrder = availableOrders.find(order => order.id === formData.orderId);
-  const selectedStage = productionStages.find(stage => stage.id === formData.stage);
+  const selectedOrder = availableOrders.find(
+    (order) => order.id === formData.orderId,
+  );
+  const selectedStage = productionStages.find(
+    (stage) => stage.id === formData.stage,
+  );
   const availableOperators: any[] = [];
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!selectedOrder || !selectedStage) return;
 
     const newTask: Partial<ProductionTask> = {
       ...formData,
       id: Date.now().toString(),
       orderNumber: selectedOrder.order_number,
-      productName: selectedOrder.products?.[0]?.product_name || 'Produto',
+      productName: selectedOrder.products?.[0]?.product_name || "Produto",
       customerId: selectedOrder.customer_id,
-      customerName: selectedOrder.customer_name || 'Cliente',
+      customerName: selectedOrder.customer_name || "Cliente",
       stageOrder: selectedStage.order,
-      status: 'pending',
+      status: "pending",
       progress: 0,
       startTime: undefined,
-      actualCompletionTime: undefined
+      actualCompletionTime: undefined,
     };
 
     onSave(newTask);
@@ -99,19 +120,32 @@ export default function NewTaskForm({ onSave, onCancel }: NewTaskFormProps) {
                 <Label htmlFor="order">Pedido</Label>
                 <Select
                   value={formData.orderId}
-                  onValueChange={(value) => setFormData(prev => ({ ...prev, orderId: value }))}
+                  onValueChange={(value) =>
+                    setFormData((prev) => ({ ...prev, orderId: value }))
+                  }
                   disabled={loading}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder={loading ? "Carregando pedidos..." : availableOrders.length === 0 ? "Nenhum pedido disponível" : "Selecione um pedido"} />
+                    <SelectValue
+                      placeholder={
+                        loading
+                          ? "Carregando pedidos..."
+                          : availableOrders.length === 0
+                            ? "Nenhum pedido disponível"
+                            : "Selecione um pedido"
+                      }
+                    />
                   </SelectTrigger>
                   <SelectContent>
-                    {availableOrders.map(order => (
+                    {availableOrders.map((order) => (
                       <SelectItem key={order.id} value={order.id}>
                         <div>
-                          <div className="font-medium">{order.order_number}</div>
+                          <div className="font-medium">
+                            {order.order_number}
+                          </div>
                           <div className="text-sm text-muted-foreground">
-                            {order.customer_name} - {order.products?.[0]?.product_name || 'Produto'}
+                            {order.customer_name} -{" "}
+                            {order.products?.[0]?.product_name || "Produto"}
                           </div>
                         </div>
                       </SelectItem>
@@ -121,9 +155,14 @@ export default function NewTaskForm({ onSave, onCancel }: NewTaskFormProps) {
               </div>
               <div>
                 <Label htmlFor="priority">Prioridade</Label>
-                <Select 
-                  value={formData.priority} 
-                  onValueChange={(value) => setFormData(prev => ({ ...prev, priority: value as ProductionTask['priority'] }))}
+                <Select
+                  value={formData.priority}
+                  onValueChange={(value) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      priority: value as ProductionTask["priority"],
+                    }))
+                  }
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -141,12 +180,17 @@ export default function NewTaskForm({ onSave, onCancel }: NewTaskFormProps) {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="stage">Etapa de Produção</Label>
-                <Select value={formData.stage} onValueChange={(value) => setFormData(prev => ({ ...prev, stage: value }))}>
+                <Select
+                  value={formData.stage}
+                  onValueChange={(value) =>
+                    setFormData((prev) => ({ ...prev, stage: value }))
+                  }
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione a etapa" />
                   </SelectTrigger>
                   <SelectContent>
-                    {productionStages.map(stage => (
+                    {productionStages.map((stage) => (
                       <SelectItem key={stage.id} value={stage.id}>
                         <div>
                           <div className="font-medium">{stage.name}</div>
@@ -161,21 +205,29 @@ export default function NewTaskForm({ onSave, onCancel }: NewTaskFormProps) {
               </div>
               <div>
                 <Label htmlFor="operator">Operador</Label>
-                <Select 
-                  value={formData.assignedOperator} 
-                  onValueChange={(value) => setFormData(prev => ({ ...prev, assignedOperator: value }))}
+                <Select
+                  value={formData.assignedOperator}
+                  onValueChange={(value) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      assignedOperator: value,
+                    }))
+                  }
                   disabled={!selectedStage}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione o operador" />
                   </SelectTrigger>
                   <SelectContent>
-                    {availableOperators.map(operator => (
+                    {availableOperators.map((operator) => (
                       <SelectItem key={operator.id} value={operator.name}>
                         <div>
                           <div className="font-medium">{operator.name}</div>
                           <div className="text-sm text-muted-foreground">
-                            Eficiência: {operator.efficiency}% • {operator.status === 'available' ? 'Disponível' : 'Ocupado'}
+                            Eficiência: {operator.efficiency}% •{" "}
+                            {operator.status === "available"
+                              ? "Disponível"
+                              : "Ocupado"}
                           </div>
                         </div>
                       </SelectItem>
@@ -189,9 +241,16 @@ export default function NewTaskForm({ onSave, onCancel }: NewTaskFormProps) {
               <Label>Data de Conclusão Estimada</Label>
               <Popover open={showCalendar} onOpenChange={setShowCalendar}>
                 <PopoverTrigger asChild>
-                  <Button variant="outline" className="w-full justify-start text-left font-normal">
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start text-left font-normal"
+                  >
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {format(formData.estimatedCompletionTime, "dd/MM/yyyy HH:mm", { locale: ptBR })}
+                    {format(
+                      formData.estimatedCompletionTime,
+                      "dd/MM/yyyy HH:mm",
+                      { locale: ptBR },
+                    )}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
@@ -200,7 +259,10 @@ export default function NewTaskForm({ onSave, onCancel }: NewTaskFormProps) {
                     selected={formData.estimatedCompletionTime}
                     onSelect={(date) => {
                       if (date) {
-                        setFormData(prev => ({ ...prev, estimatedCompletionTime: date }));
+                        setFormData((prev) => ({
+                          ...prev,
+                          estimatedCompletionTime: date,
+                        }));
                         setShowCalendar(false);
                       }
                     }}
@@ -215,14 +277,22 @@ export default function NewTaskForm({ onSave, onCancel }: NewTaskFormProps) {
                 <h4 className="font-medium mb-2">Detalhes da Etapa</h4>
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
-                    <span className="text-muted-foreground">Tempo Estimado:</span>
-                    <span className="ml-2 font-medium">{selectedStage.estimatedTime} minutos</span>
+                    <span className="text-muted-foreground">
+                      Tempo Estimado:
+                    </span>
+                    <span className="ml-2 font-medium">
+                      {selectedStage.estimatedTime} minutos
+                    </span>
                   </div>
                   <div>
                     <span className="text-muted-foreground">Habilidades:</span>
                     <div className="flex flex-wrap gap-1 mt-1">
-                      {selectedStage.requiredSkills.map(skill => (
-                        <Badge key={skill} variant="outline" className="text-xs">
+                      {selectedStage.requiredSkills.map((skill) => (
+                        <Badge
+                          key={skill}
+                          variant="outline"
+                          className="text-xs"
+                        >
                           {skill}
                         </Badge>
                       ))}
@@ -241,7 +311,9 @@ export default function NewTaskForm({ onSave, onCancel }: NewTaskFormProps) {
               <Textarea
                 id="notes"
                 value={formData.notes}
-                onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, notes: e.target.value }))
+                }
                 placeholder="Observações especiais para esta tarefa..."
                 rows={3}
               />
@@ -251,8 +323,8 @@ export default function NewTaskForm({ onSave, onCancel }: NewTaskFormProps) {
               <Button type="button" variant="outline" onClick={onCancel}>
                 Cancelar
               </Button>
-              <Button 
-                type="submit" 
+              <Button
+                type="submit"
                 className="bg-biobox-green hover:bg-biobox-green-dark"
                 disabled={!formData.orderId || !formData.stage}
               >

@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Clock, User, Package } from "lucide-react";
-import { useSupabase } from "@/hooks/useSupabase";
+import { useFirebase } from "@/hooks/useFirebase";
 
 const statusColors = {
   cutting: "bg-orange-500/10 text-orange-500 border-orange-500/20",
@@ -46,7 +46,7 @@ const priorityColors = {
 export default function ProductionOverview() {
   const [loading, setLoading] = useState(true);
   const [productionItems, setProductionItems] = useState<any[]>([]);
-  const { getOrders } = useSupabase();
+  const { getOrders } = useFirebase();
 
   useEffect(() => {
     loadProductionData();
@@ -57,8 +57,8 @@ export default function ProductionOverview() {
       setLoading(true);
       const orders = await getOrders();
 
-      const inProduction = orders.filter(order =>
-        ['confirmed', 'in_production', 'quality_check'].includes(order.status)
+      const inProduction = orders.filter((order) =>
+        ["confirmed", "in_production", "quality_check"].includes(order.status),
       );
 
       setProductionItems(inProduction);
@@ -132,7 +132,10 @@ export default function ProductionOverview() {
           <CardTitle className="text-lg font-semibold text-foreground">
             Visão Geral da Produção
           </CardTitle>
-          <Badge variant="outline" className="border-biobox-green text-biobox-green">
+          <Badge
+            variant="outline"
+            className="border-biobox-green text-biobox-green"
+          >
             {productionItems.length} em produção
           </Badge>
         </div>
@@ -187,7 +190,10 @@ export default function ProductionOverview() {
                   )}
                   <div className="flex items-center space-x-1 text-muted-foreground">
                     <Clock className="h-3 w-3" />
-                    <span>Conclusão em {calculateEstimatedCompletion(item.production_progress)}</span>
+                    <span>
+                      Conclusão em{" "}
+                      {calculateEstimatedCompletion(item.production_progress)}
+                    </span>
                   </div>
                 </div>
               </div>

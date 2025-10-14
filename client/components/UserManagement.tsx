@@ -37,7 +37,7 @@ import {
 import { User as UserType, mockUsers, defaultPermissions } from "@/types/user";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
-import { useSupabase } from "@/hooks/useSupabase";
+import { useFirebase } from "@/hooks/useFirebase";
 import { db, isFirebaseConfigured, auth, app } from "@/lib/firebase";
 import {
   addDoc,
@@ -61,7 +61,7 @@ export default function UserManagement() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const { user } = useAuth();
-  const { getUsers: fetchUsers } = useSupabase();
+  const { getUsers: fetchUsers } = useFirebase();
   const { toast } = useToast();
   const [showForm, setShowForm] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserType | undefined>();

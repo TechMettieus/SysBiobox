@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
-import { useSupabase, Order } from "@/hooks/useSupabase";
+import { useFirebase, Order } from "@/hooks/useFirebase";
 
 interface NewProductionTaskProps {
   onClose: () => void;
@@ -22,7 +22,7 @@ export default function NewProductionTask({
   onClose,
   onSaved,
 }: NewProductionTaskProps) {
-  const { getOrders } = useSupabase();
+  const { getOrders } = useFirebase();
   const [orders, setOrders] = useState<Order[]>([]);
   const [form, setForm] = useState({
     order_id: "",

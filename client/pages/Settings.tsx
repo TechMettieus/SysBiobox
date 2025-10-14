@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import DashboardLayout from "@/components/DashboardLayout";
 import BarcodeGenerator from "@/components/BarcodeGenerator";
 import UserManagement from "@/components/UserManagement";
-import { useSupabase } from "@/hooks/useSupabase";
+import { useFirebase } from "@/hooks/useFirebase";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -107,7 +107,7 @@ export default function Settings() {
   });
 
   const [saved, setSaved] = useState(false);
-  const { getUsers, getCustomers, getProducts, getOrders } = useSupabase();
+  const { getUsers, getCustomers, getProducts, getOrders } = useFirebase();
   const { user } = useAuth();
 
   useEffect(() => {

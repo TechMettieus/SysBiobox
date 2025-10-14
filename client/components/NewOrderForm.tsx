@@ -35,7 +35,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { useSupabase } from "@/hooks/useSupabase";
+import { useFirebase } from "@/hooks/useFirebase";
 import { useToast } from "@/components/ui/use-toast";
 
 interface OrderProduct {
@@ -63,32 +63,32 @@ export default function NewOrderForm({
   onOrderCreated,
 }: NewOrderFormProps) {
   const { user } = useAuth();
-  const { getCustomers, getProducts } = useSupabase();
+  const { getCustomers, getProducts } = useFirebase();
   const { toast } = useToast();
-  
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [customers, setCustomers] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
-  
+
   const [step, setStep] = useState(1);
   const [selectedCustomer, setSelectedCustomer] = useState<any | null>(null);
 
   // Função segura para selecionar cliente
   const handleSelectCustomer = (customer: any) => {
     console.log("🔄 Selecionando cliente:", customer);
-    
+
     // Verificar se já está selecionado
     if (selectedCustomer?.id === customer.id) {
       console.log("⚠️ Cliente já selecionado, mantendo seleção");
       return;
     }
-    
+
     // Limpar formulário de novo cliente
     if (showNewCustomerForm) {
       setShowNewCustomerForm(false);
     }
-    
+
     setSelectedCustomer(customer);
     console.log("✅ Cliente selecionado com sucesso");
   };
@@ -129,7 +129,6 @@ export default function NewOrderForm({
       const productsData = await getProducts();
       console.log("📦 Produtos carregados:", productsData?.length || 0);
       setProducts(productsData || []);
-
     } catch (error) {
       console.error("❌ Erro ao carregar dados:", error);
       toast({
@@ -152,8 +151,9 @@ export default function NewOrderForm({
       );
     })
     // Remover duplicatas baseado no ID
-    .filter((customer, index, self) => 
-      index === self.findIndex((c) => c.id === customer.id)
+    .filter(
+      (customer, index, self) =>
+        index === self.findIndex((c) => c.id === customer.id),
     );
 
   const addProduct = () => {
@@ -189,7 +189,9 @@ export default function NewOrderForm({
           productName: product.name,
           model: product.sku || product.model || "Standard",
           unitPrice: product.base_price || product.basePrice || 0,
-          totalPrice: (product.base_price || product.basePrice || 0) * updated[index].quantity,
+          totalPrice:
+            (product.base_price || product.basePrice || 0) *
+            updated[index].quantity,
         };
       }
     }
@@ -254,7 +256,13 @@ export default function NewOrderForm({
 
       // Verificar se todos os produtos estão completos
       const hasIncompleteProducts = orderProducts.some(
-        (p) => !p.productId || !p.size || !p.color || !p.fabric || p.quantity <= 0 || p.unitPrice <= 0
+        (p) =>
+          !p.productId ||
+          !p.size ||
+          !p.color ||
+          !p.fabric ||
+          p.quantity <= 0 ||
+          p.unitPrice <= 0,
       );
 
       if (hasIncompleteProducts) {
@@ -288,7 +296,7 @@ export default function NewOrderForm({
         delivery_date: orderDetails.deliveryDate || null,
         production_progress: 0,
         notes: orderDetails.notes || "",
-        products: orderProducts.map(p => ({
+        products: orderProducts.map((p) => ({
           product_id: p.productId,
           product_name: p.productName,
           model: p.model,
@@ -303,7 +311,7 @@ export default function NewOrderForm({
 
       console.log("💾 Criando pedido:", newOrder);
 
-      // Passar para o componente pai que irá salvar no Supabase
+      // Passar para o componente pai que irá salvar no Firebase
       await onOrderCreated(newOrder);
 
       toast({
@@ -314,7 +322,6 @@ export default function NewOrderForm({
       // Reset form
       resetForm();
       onOpenChange(false);
-
     } catch (error) {
       console.error("❌ Erro ao criar pedido:", error);
       toast({
@@ -486,8 +493,12 @@ export default function NewOrderForm({
                 {customers.length === 0 ? (
                   <div className="text-center py-8">
                     <AlertCircle className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-                    <p className="text-muted-foreground">Nenhum cliente cadastrado</p>
-                    <p className="text-sm text-muted-foreground">Clique em "Novo Cliente" para cadastrar</p>
+                    <p className="text-muted-foreground">
+                      Nenhum cliente cadastrado
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      Clique em "Novo Cliente" para cadastrar
+                    </p>
                   </div>
                 ) : (
                   <div className="max-h-60 overflow-y-auto space-y-2">
@@ -506,7 +517,8 @@ export default function NewOrderForm({
                             <div>
                               <div className="font-medium">{customer.name}</div>
                               <div className="text-sm text-muted-foreground">
-                                {customer.phone} • {customer.email || "Sem email"}
+                                {customer.phone} •{" "}
+                                {customer.email || "Sem email"}
                               </div>
                             </div>
                             <Badge
@@ -543,8 +555,12 @@ export default function NewOrderForm({
             {products.length === 0 ? (
               <div className="text-center py-8">
                 <AlertCircle className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-                <p className="text-muted-foreground">Nenhum produto cadastrado</p>
-                <p className="text-sm text-muted-foreground">Cadastre produtos antes de criar pedidos</p>
+                <p className="text-muted-foreground">
+                  Nenhum produto cadastrado
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Cadastre produtos antes de criar pedidos
+                </p>
               </div>
             ) : orderProducts.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
@@ -572,8 +588,10 @@ export default function NewOrderForm({
                     </TableHeader>
                     <TableBody>
                       {orderProducts.map((product, index) => {
-                        const selectedProduct = products.find(p => p.id === product.productId);
-                        
+                        const selectedProduct = products.find(
+                          (p) => p.id === product.productId,
+                        );
+
                         return (
                           <TableRow key={product.id}>
                             <TableCell>
@@ -732,7 +750,7 @@ export default function NewOrderForm({
                       scheduledDate: e.target.value,
                     })
                   }
-                  min={new Date().toISOString().split('T')[0]}
+                  min={new Date().toISOString().split("T")[0]}
                 />
               </div>
             </div>
@@ -749,7 +767,10 @@ export default function NewOrderForm({
                     deliveryDate: e.target.value,
                   })
                 }
-                min={orderDetails.scheduledDate || new Date().toISOString().split('T')[0]}
+                min={
+                  orderDetails.scheduledDate ||
+                  new Date().toISOString().split("T")[0]
+                }
               />
             </div>
 

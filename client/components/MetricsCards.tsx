@@ -10,7 +10,7 @@ import {
   Clock,
   CheckCircle,
 } from "lucide-react";
-import { useSupabase, Order } from "@/hooks/useSupabase";
+import { useFirebase, Order } from "@/hooks/useFirebase";
 
 type MetricTrend = "up" | "down" | "neutral" | undefined;
 
@@ -200,7 +200,7 @@ export default function MetricsCards() {
     deliveredOrders: 0,
   });
 
-  const { getOrders } = useSupabase();
+  const { getOrders } = useFirebase();
 
   useEffect(() => {
     loadMetrics();
