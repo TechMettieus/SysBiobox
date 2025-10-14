@@ -22,7 +22,7 @@ export default function Production() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl font-bold text-foreground">
               Acompanhamento de Produção
@@ -31,7 +31,7 @@ export default function Production() {
               Monitore e controle o processo de fabricação em tempo real
             </p>
           </div>
-          <div className="flex items-center space-x-2">
+          <div className="flex flex-wrap items-center gap-2 sm:justify-end">
             <Button variant="outline" onClick={() => setShowReport(true)}>
               <Download className="h-4 w-4 mr-2" />
               Relatório
