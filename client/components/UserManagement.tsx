@@ -281,15 +281,16 @@ export default function UserManagement() {
               variant: "destructive",
             });
           } else {
+            let secondary: any = null;
+            let secondaryAuth: any = null;
+            let deleteAppFn: any = null;
             try {
-              const { initializeApp: initializeFirebaseApp, deleteApp } = await import(
-                "firebase/app"
-              );
-              const secondary = initializeFirebaseApp(
-                (app as any).options,
-                `auth-create-${Date.now()}`,
-              );
-              const secondaryAuth = getAuth(secondary);
+              const mod = await import("firebase/app");
+              const initializeFirebaseApp = mod.initializeApp;
+              deleteAppFn = mod.deleteApp;
+
+              secondary = initializeFirebaseApp((app as any).options, `auth-create-${Date.now()}`);
+              secondaryAuth = getAuth(secondary);
 
               const userCredential = await createUserWithEmailAndPassword(
                 secondaryAuth,
@@ -305,18 +306,14 @@ export default function UserManagement() {
                 });
               } catch {}
 
-              await signOut(secondaryAuth);
-              await deleteApp(secondary);
-
               toast({
                 title: "Conta criada no Firebase Auth",
                 description: "Usuário autenticado criado com sucesso",
               });
             } catch (error: any) {
-              console.error("Erro no Firebase Auth:", error);
-
-              // Specific handling for common network error
-              if (error.code === "auth/network-request-failed") {
+              // Log non-sensitive info, but avoid noisy stack for network errors
+              if (error?.code === "auth/network-request-failed") {
+                console.warn("Firebase network error while creating user (fallback):", error.message);
                 userId = `user-${Date.now()}`;
                 toast({
                   title: "Erro de rede no Firebase",
@@ -324,14 +321,23 @@ export default function UserManagement() {
                     "Não foi possível conectar ao Firebase. Usuário criado sem autenticação Firebase",
                   variant: "destructive",
                 });
-              } else if (error.code === "auth/email-already-in-use") {
+              } else if (error?.code === "auth/email-already-in-use") {
                 toast({
                   title: "Email já cadastrado",
                   description: "Este email já está sendo usado por outro usuário",
                   variant: "destructive",
                 });
+                // ensure cleanup of secondary app below
+                // and exit to prevent creating duplicate local user
+                try {
+                  if (secondaryAuth) await signOut(secondaryAuth);
+                } catch {}
+                try {
+                  if (secondary && deleteAppFn) await deleteAppFn(secondary);
+                } catch {}
                 return;
               } else {
+                console.warn("Firebase Auth error, falling back:", error?.message || error);
                 userId = `user-${Date.now()}`;
                 toast({
                   title: "Aviso",
@@ -339,6 +345,13 @@ export default function UserManagement() {
                   variant: "destructive",
                 });
               }
+            } finally {
+              try {
+                if (secondaryAuth) await signOut(secondaryAuth);
+              } catch {}
+              try {
+                if (secondary && deleteAppFn) await deleteAppFn(secondary);
+              } catch (e) {}
             }
           }
         } else {
