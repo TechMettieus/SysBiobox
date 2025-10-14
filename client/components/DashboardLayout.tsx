@@ -83,12 +83,11 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           {/* Logo */}
           <div className="flex h-16 items-center justify-between px-6 border-b border-sidebar-border">
             <div className="flex items-center space-x-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-biobox-green">
-                <span className="text-xs font-bold text-biobox-dark">BB</span>
-              </div>
-              <span className="text-lg font-semibold text-sidebar-foreground">
-                BioBoxsys
-              </span>
+              <img 
+                src="/logobio.png" 
+                alt="BioBox" 
+                className="h-10 w-auto object-contain"
+              />
             </div>
             <Button
               variant="ghost"
@@ -175,7 +174,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         </header>
 
         {/* Page content */}
-        <main className="p-4 sm:p-6 lg:p-8">{children}</main>
+        <main className="p-6 lg:p-8">{children}</main>
       </div>
     </div>
   );
