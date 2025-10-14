@@ -35,7 +35,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { useSupabase } from "@/hooks/useSupabase";
+import { useFirebase } from "@/hooks/useFirebase";
 import { useToast } from "@/components/ui/use-toast";
 
 interface OrderProduct {
@@ -63,7 +63,7 @@ export default function NewOrderForm({
   onOrderCreated,
 }: NewOrderFormProps) {
   const { user } = useAuth();
-  const { getCustomers, getProducts } = useSupabase();
+  const { getCustomers, getProducts } = useFirebase();
   const { toast } = useToast();
   
   const [loading, setLoading] = useState(true);
@@ -303,7 +303,7 @@ export default function NewOrderForm({
 
       console.log("💾 Criando pedido:", newOrder);
 
-      // Passar para o componente pai que irá salvar no Supabase
+      // Passar para o componente pai que irá salvar no Firebase
       await onOrderCreated(newOrder);
 
       toast({
