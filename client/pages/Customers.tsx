@@ -33,7 +33,7 @@ import {
 } from "lucide-react";
 import { Customer } from "@/types/customer";
 import { cn } from "@/lib/utils";
-import { useSupabase } from "@/hooks/useSupabase";
+import { useFirebase } from "@/hooks/useFirebase";
 import { db, isFirebaseConfigured } from "@/lib/firebase";
 import { collection, getDocs } from "firebase/firestore";
 
@@ -55,7 +55,7 @@ export default function Customers() {
     createCustomer: createCustomerFn,
     updateCustomer: updateCustomerFn,
     deleteCustomer: deleteCustomerFn,
-  } = useSupabase();
+  } = useFirebase();
   const { toast } = useToast();
 
   // Carregar clientes diretamente do Firestore quando disponível (fallback para hook)
@@ -374,7 +374,7 @@ export default function Customers() {
               Gerenciamento de Clientes
             </h1>
             <p className="text-muted-foreground">
-              Cadastre e gerencie seus clientes com persistência no Supabase
+              Cadastre e gerencie seus clientes com persistência no Firebase
             </p>
           </div>
           <Button
