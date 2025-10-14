@@ -200,6 +200,22 @@ export default function MetricsCards() {
 
   useEffect(() => {
     loadMetrics();
+
+    const onOrdersChanged = () => {
+      loadMetrics();
+    };
+
+    if (typeof window !== "undefined") {
+      window.addEventListener("orders:changed", onOrdersChanged as EventListener);
+      window.addEventListener("storage", onOrdersChanged as EventListener);
+    }
+
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("orders:changed", onOrdersChanged as EventListener);
+        window.removeEventListener("storage", onOrdersChanged as EventListener);
+      }
+    };
   }, []);
 
   const loadMetrics = async () => {
