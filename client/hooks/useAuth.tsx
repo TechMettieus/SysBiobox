@@ -76,6 +76,24 @@ export function useAuthProvider(): AuthContextType {
                       { id: permId, name: permId, module: "system", actions: [] }
                     );
 
+                    // Função auxiliar para converter datas
+                    const parseDate = (value: any): Date => {
+                      if (!value) return new Date();
+                      if (value instanceof Date) return value;
+                      if (typeof value?.toDate === "function") {
+                        try {
+                          return value.toDate();
+                        } catch {
+                          return new Date();
+                        }
+                      }
+                      if (typeof value === "string" || typeof value === "number") {
+                        const parsed = new Date(value);
+                        return isNaN(parsed.getTime()) ? new Date() : parsed;
+                      }
+                      return new Date();
+                    };
+
                     const fullUser: User = {
                       id: firebaseUser.uid,
                       name: userData.name || firebaseUser.displayName || "Usuário",
@@ -138,6 +156,24 @@ export function useAuthProvider(): AuthContextType {
                         defaultPermissions.find(p => p.id === permId) || 
                         { id: permId, name: permId, module: "system", actions: [] }
                       );
+
+                      // Função auxiliar para converter datas
+                      const parseDate = (value: any): Date => {
+                        if (!value) return new Date();
+                        if (value instanceof Date) return value;
+                        if (typeof value?.toDate === "function") {
+                          try {
+                            return value.toDate();
+                          } catch {
+                            return new Date();
+                          }
+                        }
+                        if (typeof value === "string" || typeof value === "number") {
+                          const parsed = new Date(value);
+                          return isNaN(parsed.getTime()) ? new Date() : parsed;
+                        }
+                        return new Date();
+                      };
 
                       const fullUser: User = {
                         id: firebaseUser.uid,
