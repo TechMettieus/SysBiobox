@@ -77,22 +77,44 @@ export default function UserManagement() {
     try {
       setLoading(true);
       const usersData = await fetchUsers();
+      const parseDate = (val: any) => {
+        if (!val) return undefined;
+        if (val instanceof Date) return val;
+        if (typeof val === "string") {
+          const d = new Date(val);
+          return Number.isNaN(d.getTime()) ? undefined : d;
+        }
+        if (typeof val?.toDate === "function") {
+          try {
+            return val.toDate();
+          } catch {
+            return undefined;
+          }
+        }
+        try {
+          const d = new Date(val);
+          return Number.isNaN(d.getTime()) ? undefined : d;
+        } catch {
+          return undefined;
+        }
+      };
+
       const formattedUsers: UserType[] = usersData.map((u) => ({
         id: u.id,
         name: u.name,
         email: u.email,
-        role: u.role as "admin" | "seller",
-        status: "active",
-        permissions: (u.permissions || []).map((permId) => {
+        role: (u.role || "seller") as "admin" | "seller",
+        status: u.status || "active",
+        permissions: (u.permissions || []).map((permId: any) => {
           const perm = defaultPermissions.find((p) => p.id === permId);
           return (
             perm ||
             ({ id: permId, name: permId, module: "system", actions: [] } as any)
           );
         }),
-        createdAt: new Date(u.created_at),
-        updatedAt: new Date(u.updated_at),
-        createdBy: "system",
+        createdAt: parseDate(u.created_at) || parseDate(u.createdAt) || new Date(),
+        updatedAt: parseDate(u.updated_at) || parseDate(u.updatedAt) || parseDate(u.created_at) || new Date(),
+        createdBy: u.createdBy || "system",
       }));
       setUsers(formattedUsers.length > 0 ? formattedUsers : mockUsers);
     } catch (e) {
