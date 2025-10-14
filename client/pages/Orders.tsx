@@ -617,7 +617,7 @@ export default function OrdersSupabase() {
         description: `Pedido ${updated.order_number} agora está em "${statusLabels[nextStatus]}"`,
       });
       if (nextStatus === "in_production") {
-        navigate("/production");
+        navigate(`/production?orderId=${updated.id}`);
       }
     }
   };
