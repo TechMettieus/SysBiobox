@@ -461,7 +461,7 @@ export default function Customers() {
                 <Users className="h-5 w-5" />
                 <span>Lista de Clientes</span>
               </CardTitle>
-              <div className="flex items-center space-x-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:space-x-4">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
