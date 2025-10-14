@@ -8,7 +8,7 @@ import {
 import { User, defaultPermissions, Permission } from "@/types/user";
 import { db, auth, isFirebaseConfigured } from "@/lib/firebase";
 import { onAuthStateChanged, signOut, signInWithEmailAndPassword } from "firebase/auth";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, onSnapshot } from "firebase/firestore";
 
 interface AuthContextType {
   user: User | null;
@@ -39,87 +39,131 @@ export function useAuthProvider(): AuthContextType {
 
         // Se o Firebase estiver configurado, usar autenticação do Firebase
         if (isFirebaseConfigured && auth) {
+          let userDocUnsubscribe: (() => void) | null = null;
+          
           const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
             if (firebaseUser) {
               console.log("🔥 Usuário Firebase autenticado:", firebaseUser.email);
               
-              // Buscar dados completos do usuário no Firestore
-              try {
-                const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
-                
-                if (userDoc.exists()) {
-                  const userData = userDoc.data();
-                  const permissions = (userData.permissions || []).map((permId: string) => 
-                    defaultPermissions.find(p => p.id === permId) || 
-                    { id: permId, name: permId, module: "system", actions: [] }
-                  );
+              // Configurar listener em tempo real para o documento do usuário
+              const userDocRef = doc(db, "users", firebaseUser.uid);
+              
+              userDocUnsubscribe = onSnapshot(
+                userDocRef,
+                async (docSnapshot) => {
+                  if (docSnapshot.exists()) {
+                    const userData = docSnapshot.data();
+                    const permissions = (userData.permissions || []).map((permId: string) => 
+                      defaultPermissions.find(p => p.id === permId) || 
+                      { id: permId, name: permId, module: "system", actions: [] }
+                    );
 
-                  const fullUser: User = {
-                    id: firebaseUser.uid,
-                    name: userData.name || firebaseUser.displayName || "Usuário",
-                    email: firebaseUser.email || "",
-                    role: userData.role || "seller",
-                    permissions: permissions,
-                    status: userData.status || "active",
-                    createdAt: userData.created_at?.toDate() || new Date(),
-                    updatedAt: userData.updated_at?.toDate() || new Date(),
-                    createdBy: userData.created_by || "system",
-                  };
+                    const fullUser: User = {
+                      id: firebaseUser.uid,
+                      name: userData.name || firebaseUser.displayName || "Usuário",
+                      email: firebaseUser.email || "",
+                      role: userData.role || "seller",
+                      permissions: permissions,
+                      status: userData.status || "active",
+                      createdAt: userData.created_at?.toDate() || new Date(),
+                      updatedAt: userData.updated_at?.toDate() || new Date(),
+                      createdBy: userData.created_by || "system",
+                    };
 
-                  setUser(fullUser);
-                  localStorage.setItem("biobox_user", JSON.stringify(fullUser));
-                  console.log("✅ Dados do usuário atualizados do Firestore");
-                } else {
-                  // Se não existir no Firestore, criar um documento básico
-                  const basicUser: User = {
-                    id: firebaseUser.uid,
-                    name: firebaseUser.displayName || "Usuário",
-                    email: firebaseUser.email || "",
-                    role: "seller",
-                    permissions: defaultPermissions.filter(p => 
-                      ["orders-full", "customers-full"].includes(p.id)
-                    ),
-                    status: "active",
-                    createdAt: new Date(),
-                    updatedAt: new Date(),
-                    createdBy: "system",
-                  };
+                    setUser(fullUser);
+                    localStorage.setItem("biobox_user", JSON.stringify(fullUser));
+                    console.log("🔄 Dados do usuário atualizados em tempo real:", {
+                      name: fullUser.name,
+                      role: fullUser.role,
+                      permissions: fullUser.permissions.length
+                    });
+                  } else {
+                    // Se não existir no Firestore, criar um documento básico
+                    console.log("⚠️ Documento do usuário não encontrado, criando novo...");
+                    const basicUser: User = {
+                      id: firebaseUser.uid,
+                      name: firebaseUser.displayName || "Usuário",
+                      email: firebaseUser.email || "",
+                      role: "seller",
+                      permissions: defaultPermissions.filter(p => 
+                        ["orders-full", "customers-full"].includes(p.id)
+                      ),
+                      status: "active",
+                      createdAt: new Date(),
+                      updatedAt: new Date(),
+                      createdBy: "system",
+                    };
 
-                  await setDoc(doc(db, "users", firebaseUser.uid), {
-                    name: basicUser.name,
-                    email: basicUser.email,
-                    role: basicUser.role,
-                    permissions: basicUser.permissions.map(p => p.id),
-                    status: basicUser.status,
-                    created_at: basicUser.createdAt,
-                    updated_at: basicUser.updatedAt,
-                    created_by: basicUser.createdBy,
+                    await setDoc(doc(db, "users", firebaseUser.uid), {
+                      name: basicUser.name,
+                      email: basicUser.email,
+                      role: basicUser.role,
+                      permissions: basicUser.permissions.map(p => p.id),
+                      status: basicUser.status,
+                      created_at: basicUser.createdAt,
+                      updated_at: basicUser.updatedAt,
+                      created_by: basicUser.createdBy,
+                    });
+
+                    setUser(basicUser);
+                    localStorage.setItem("biobox_user", JSON.stringify(basicUser));
+                    console.log("✅ Novo documento de usuário criado no Firestore");
+                  }
+                },
+                (error) => {
+                  console.error("❌ Erro no listener do documento do usuário:", error);
+                  // Em caso de erro, tentar buscar uma vez
+                  getDoc(userDocRef).then((userDoc) => {
+                    if (userDoc.exists()) {
+                      const userData = userDoc.data();
+                      const permissions = (userData.permissions || []).map((permId: string) => 
+                        defaultPermissions.find(p => p.id === permId) || 
+                        { id: permId, name: permId, module: "system", actions: [] }
+                      );
+
+                      const fullUser: User = {
+                        id: firebaseUser.uid,
+                        name: userData.name || firebaseUser.displayName || "Usuário",
+                        email: firebaseUser.email || "",
+                        role: userData.role || "seller",
+                        permissions: permissions,
+                        status: userData.status || "active",
+                        createdAt: userData.created_at?.toDate() || new Date(),
+                        updatedAt: userData.updated_at?.toDate() || new Date(),
+                        createdBy: userData.created_by || "system",
+                      };
+
+                      setUser(fullUser);
+                      localStorage.setItem("biobox_user", JSON.stringify(fullUser));
+                    }
+                  }).catch((err) => {
+                    console.error("❌ Erro ao buscar dados do usuário (fallback):", err);
+                    // Usar dados básicos do Firebase Auth como último recurso
+                    const fallbackUser: User = {
+                      id: firebaseUser.uid,
+                      name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || "Usuário",
+                      email: firebaseUser.email || "",
+                      role: "seller",
+                      permissions: defaultPermissions.filter(p => 
+                        ["orders-full", "customers-full"].includes(p.id)
+                      ),
+                      status: "active",
+                      createdAt: new Date(),
+                      updatedAt: new Date(),
+                      createdBy: "system",
+                    };
+                    setUser(fallbackUser);
+                    localStorage.setItem("biobox_user", JSON.stringify(fallbackUser));
                   });
-
-                  setUser(basicUser);
-                  localStorage.setItem("biobox_user", JSON.stringify(basicUser));
-                  console.log("✅ Novo documento de usuário criado no Firestore");
                 }
-              } catch (error) {
-                console.error("❌ Erro ao buscar dados do usuário:", error);
-                // Usar dados básicos do Firebase Auth
-                const fallbackUser: User = {
-                  id: firebaseUser.uid,
-                  name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || "Usuário",
-                  email: firebaseUser.email || "",
-                  role: "seller",
-                  permissions: defaultPermissions.filter(p => 
-                    ["orders-full", "customers-full"].includes(p.id)
-                  ),
-                  status: "active",
-                  createdAt: new Date(),
-                  updatedAt: new Date(),
-                  createdBy: "system",
-                };
-                setUser(fallbackUser);
-                localStorage.setItem("biobox_user", JSON.stringify(fallbackUser));
-              }
+              );
             } else {
+              // Limpar listener quando usuário faz logout
+              if (userDocUnsubscribe) {
+                userDocUnsubscribe();
+                userDocUnsubscribe = null;
+              }
+              
               // Usuário não autenticado no Firebase
               console.log("👤 Nenhum usuário Firebase autenticado");
               // Manter o usuário do localStorage se existir
@@ -131,7 +175,12 @@ export function useAuthProvider(): AuthContextType {
             setIsLoading(false);
           });
 
-          return () => unsubscribe();
+          return () => {
+            unsubscribe();
+            if (userDocUnsubscribe) {
+              userDocUnsubscribe();
+            }
+          };
         } else {
           // Firebase não configurado - usar apenas localStorage
           console.log("📦 Usando modo offline (localStorage apenas)");
@@ -275,3 +324,4 @@ export function useAuth() {
   }
   return context;
 }
+
