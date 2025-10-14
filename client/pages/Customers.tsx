@@ -391,7 +391,7 @@ export default function Customers() {
         </div>
 
         {/* Stats e Filtros ... (código existente) */}
-        <div className="grid gap-4 md:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Card className="bg-card border-border">
             <CardContent className="p-6">
               <div className="flex items-center">
