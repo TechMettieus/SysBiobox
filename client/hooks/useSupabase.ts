@@ -143,6 +143,22 @@ export function useSupabase() {
     setLoading(false);
   }, []);
 
+  const normalizeStatus = (value: any): string => {
+    if (!value) return "pending";
+    if (typeof value === "string") {
+      const v = value.toLowerCase().trim();
+      if (["pending", "pendente", "pendent", "aguardando"].includes(v)) return "pending";
+      if (["confirmed", "confirmado", "confirmada"].includes(v)) return "confirmed";
+      if (["in_production", "in_production", "em_producao", "em_produção", "producing"].includes(v)) return "in_production";
+      if (["quality_check", "quality_check", "checagem_qualidade", "quality"].includes(v)) return "quality_check";
+      if (["ready", "pronto", "prontos"].includes(v)) return "ready";
+      if (["delivered", "entregue", "concluido", "concluído", "completed", "finalizado", "finalizado"].includes(v)) return "delivered";
+      if (["cancelled", "cancelado", "cancelada"].includes(v)) return "cancelled";
+      return v;
+    }
+    return String(value);
+  };
+
   // Dados mock para fallback
   const mockUsers: User[] = [
     {
