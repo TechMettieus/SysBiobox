@@ -248,7 +248,7 @@ export default function Customers() {
             await loadCustomers(); // Recarregar dados
           }
         } catch (err) {
-          console.error("❌ Erro ao criar cliente:", err);
+          console.error("��� Erro ao criar cliente:", err);
           const newCustomer: Customer = {
             ...customerData,
             id: Date.now().toString(),
@@ -462,7 +462,7 @@ export default function Customers() {
                 <span>Lista de Clientes</span>
               </CardTitle>
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:space-x-4">
-                <div className="relative">
+                <div className="relative w-full sm:w-auto">
                   <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     placeholder="Buscar clientes..."
