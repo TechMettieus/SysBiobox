@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,7 +10,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Badge } from "@/components/ui/badge";
 import { X, Save, Calendar as CalendarIcon, User, Package, Clock } from "lucide-react";
 import { ProductionTask, productionStages } from "@/types/production";
-import { mockOrders } from "@/types/order";
+import { useSupabase, Order } from "@/hooks/useSupabase";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -29,10 +29,28 @@ export default function NewTaskForm({ onSave, onCancel }: NewTaskFormProps) {
     notes: ''
   });
   const [showCalendar, setShowCalendar] = useState(false);
+  const [availableOrders, setAvailableOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { getOrders } = useSupabase();
 
-  const availableOrders = mockOrders.filter(order => 
-    ['confirmed', 'in_production'].includes(order.status)
-  );
+  useEffect(() => {
+    loadOrders();
+  }, []);
+
+  const loadOrders = async () => {
+    try {
+      setLoading(true);
+      const orders = await getOrders();
+      const filtered = orders.filter(order =>
+        ['confirmed', 'in_production'].includes(order.status)
+      );
+      setAvailableOrders(filtered);
+    } catch (error) {
+      console.error('Erro ao carregar pedidos:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const selectedOrder = availableOrders.find(order => order.id === formData.orderId);
   const selectedStage = productionStages.find(stage => stage.id === formData.stage);
@@ -46,10 +64,10 @@ export default function NewTaskForm({ onSave, onCancel }: NewTaskFormProps) {
     const newTask: Partial<ProductionTask> = {
       ...formData,
       id: Date.now().toString(),
-      orderNumber: selectedOrder.orderNumber,
-      productName: selectedOrder.products[0]?.productName || 'Produto',
-      customerId: selectedOrder.customerId,
-      customerName: selectedOrder.customerName,
+      orderNumber: selectedOrder.order_number,
+      productName: selectedOrder.products?.[0]?.product_name || 'Produto',
+      customerId: selectedOrder.customer_id,
+      customerName: selectedOrder.customer_name || 'Cliente',
       stageOrder: selectedStage.order,
       status: 'pending',
       progress: 0,
@@ -79,17 +97,21 @@ export default function NewTaskForm({ onSave, onCancel }: NewTaskFormProps) {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="order">Pedido</Label>
-                <Select value={formData.orderId} onValueChange={(value) => setFormData(prev => ({ ...prev, orderId: value }))}>
+                <Select
+                  value={formData.orderId}
+                  onValueChange={(value) => setFormData(prev => ({ ...prev, orderId: value }))}
+                  disabled={loading}
+                >
                   <SelectTrigger>
-                    <SelectValue placeholder="Selecione um pedido" />
+                    <SelectValue placeholder={loading ? "Carregando pedidos..." : availableOrders.length === 0 ? "Nenhum pedido disponível" : "Selecione um pedido"} />
                   </SelectTrigger>
                   <SelectContent>
                     {availableOrders.map(order => (
                       <SelectItem key={order.id} value={order.id}>
                         <div>
-                          <div className="font-medium">{order.orderNumber}</div>
+                          <div className="font-medium">{order.order_number}</div>
                           <div className="text-sm text-muted-foreground">
-                            {order.customerName} - {order.products[0]?.productName}
+                            {order.customer_name} - {order.products?.[0]?.product_name || 'Produto'}
                           </div>
                         </div>
                       </SelectItem>
