@@ -249,8 +249,8 @@ export default function UserManagement() {
         // Criar no Firebase Auth em um app secundário para não afetar a sessão atual
         if (isFirebaseConfigured) {
           try {
-            const { initializeApp, deleteApp } = await import("firebase/app");
-            const secondary = initializeApp(
+            const { initializeApp: initializeFirebaseApp, deleteApp } = await import("firebase/app");
+            const secondary = initializeFirebaseApp(
               (app as any).options,
               `auth-create-${Date.now()}`,
             );
