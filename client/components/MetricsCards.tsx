@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Package,
@@ -186,56 +186,96 @@ const computeOrderTotalAmount = (order: Order): number => {
 
 export default function MetricsCards() {
   const [loading, setLoading] = useState(true);
-  const [metrics, setMetrics] = useState({
-    activeOrders: 0,
-    urgentOrders: 0,
-    inProductionOrders: 0,
-    delayedOrders: 0,
-    readyOrders: 0,
-    monthlyRevenue: 0,
-    completedToday: 0,
-    receivableValue: 0,
-    receivedValue: 0,
-    receivableOrders: 0,
-    deliveredOrders: 0,
+  const [error, setError] = useState<string | null>(null);
+  const loadingRef = useRef(false);
+  
+  // Inicializa com dados do cache se existir
+  const [metrics, setMetrics] = useState(() => {
+    try {
+      const cached = localStorage.getItem('biobox_metrics_cache');
+      if (cached) {
+        console.log("💾 [MetricsCards] Carregando do cache");
+        return JSON.parse(cached);
+      }
+    } catch (err) {
+      console.warn("⚠️ Erro ao carregar cache:", err);
+    }
+    return {
+      activeOrders: 0,
+      urgentOrders: 0,
+      inProductionOrders: 0,
+      delayedOrders: 0,
+      readyOrders: 0,
+      monthlyRevenue: 0,
+      completedToday: 0,
+      receivableValue: 0,
+      receivedValue: 0,
+      receivableOrders: 0,
+      deliveredOrders: 0,
+    };
   });
 
   const { getOrders } = useFirebase();
+  const isMountedRef = useRef(true);
 
   useEffect(() => {
-    loadMetrics();
-
-    const onOrdersChanged = () => {
-      loadMetrics();
-    };
-
-    if (typeof window !== "undefined") {
-      window.addEventListener(
-        "orders:changed",
-        onOrdersChanged as EventListener,
-      );
-      window.addEventListener("storage", onOrdersChanged as EventListener);
-    }
-
+    isMountedRef.current = true;
     return () => {
-      if (typeof window !== "undefined") {
-        window.removeEventListener(
-          "orders:changed",
-          onOrdersChanged as EventListener,
-        );
-        window.removeEventListener("storage", onOrdersChanged as EventListener);
-      }
+      isMountedRef.current = false;
     };
   }, []);
 
   const loadMetrics = async () => {
+    if (loadingRef.current) {
+      console.log("⏸️ [MetricsCards] Já está carregando, ignorando...");
+      return;
+    }
+
     try {
+      loadingRef.current = true;
       setLoading(true);
+      setError(null);
+      
+      console.log("🔍 [MetricsCards] Iniciando carregamento de métricas...");
+      
       const orders = await getOrders();
+      
+      console.log("📦 [MetricsCards] Pedidos recebidos:", {
+        total: orders?.length || 0,
+        amostra: orders?.slice(0, 2),
+        tipoOrders: typeof orders,
+        isArray: Array.isArray(orders),
+        primeiroItem: orders?.[0]
+      });
+
+      if (!orders || orders.length === 0) {
+        console.warn("⚠️ [MetricsCards] Nenhum pedido encontrado!");
+        setMetrics({
+          activeOrders: 0,
+          urgentOrders: 0,
+          inProductionOrders: 0,
+          delayedOrders: 0,
+          readyOrders: 0,
+          monthlyRevenue: 0,
+          completedToday: 0,
+          receivableValue: 0,
+          receivedValue: 0,
+          receivableOrders: 0,
+          deliveredOrders: 0,
+        });
+        loadingRef.current = false;
+        setLoading(false);
+        return;
+      }
 
       const now = new Date();
       const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+      console.log("📅 [MetricsCards] Datas de referência:", {
+        hoje: today.toISOString(),
+        inicioMes: monthStart.toISOString()
+      });
 
       const enrichedOrders: EnrichedOrder[] = orders.map((order) => {
         const status = normalizeStatus((order as any).status);
@@ -252,6 +292,11 @@ export default function MetricsCards() {
           deliveryDate,
           completedDate,
         };
+      });
+
+      console.log("✅ [MetricsCards] Pedidos enriquecidos:", {
+        total: enrichedOrders.length,
+        exemplo: enrichedOrders[0]
       });
 
       const activeOrders = enrichedOrders.filter(({ status }) =>
@@ -273,6 +318,7 @@ export default function MetricsCards() {
       const inProductionOrders = enrichedOrders.filter(
         ({ status }) => status === "in_production",
       ).length;
+      
       const readyOrders = enrichedOrders.filter(
         ({ status }) => status === "ready",
       ).length;
@@ -314,7 +360,7 @@ export default function MetricsCards() {
         0,
       );
 
-      setMetrics({
+      const calculatedMetrics = {
         activeOrders,
         urgentOrders,
         inProductionOrders,
@@ -326,13 +372,53 @@ export default function MetricsCards() {
         receivedValue,
         receivableOrders: receivableEntries.length,
         deliveredOrders: deliveredEntries.length,
-      });
+      };
+
+      console.log("📊 [MetricsCards] Métricas calculadas:", calculatedMetrics);
+
+      if (isMountedRef.current) {
+        setMetrics(calculatedMetrics);
+      }
     } catch (error) {
-      console.error("Erro ao carregar métricas:", error);
+      const errorMsg = error instanceof Error ? error.message : "Erro desconhecido";
+      console.error("❌ [MetricsCards] Erro ao carregar métricas:", error);
+      console.error("Stack:", error instanceof Error ? error.stack : "N/A");
+      if (isMountedRef.current) {
+        setError(errorMsg);
+      }
     } finally {
+      loadingRef.current = false;
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    loadMetrics();
+
+    const onOrdersChanged = () => {
+      console.log("🔄 [MetricsCards] Evento de mudança detectado, recarregando...");
+      loadMetrics();
+    };
+
+    if (typeof window !== "undefined") {
+      window.addEventListener(
+        "orders:changed",
+        onOrdersChanged as EventListener,
+      );
+      window.addEventListener("storage", onOrdersChanged as EventListener);
+    }
+
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener(
+          "orders:changed",
+          onOrdersChanged as EventListener,
+        );
+        window.removeEventListener("storage", onOrdersChanged as EventListener);
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat("pt-BR", {
@@ -356,6 +442,22 @@ export default function MetricsCards() {
             </CardContent>
           </Card>
         ))}
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="rounded-lg border border-red-500/20 bg-red-500/10 p-4">
+        <p className="text-sm text-red-500">
+          ❌ Erro ao carregar métricas: {error}
+        </p>
+        <button
+          onClick={loadMetrics}
+          className="mt-2 text-xs text-red-500 underline"
+        >
+          Tentar novamente
+        </button>
       </div>
     );
   }
