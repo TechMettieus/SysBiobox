@@ -1,5 +1,5 @@
 // client/components/OrderPrintTemplate.tsx
-import { Order } from "@/hooks/useSupabase";
+import { Order } from "@/hooks/useFirebase";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
