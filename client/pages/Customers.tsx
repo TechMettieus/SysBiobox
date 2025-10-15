@@ -649,6 +649,50 @@ export default function Customers() {
                 ))}
               </TableBody>
             </Table>
+
+            <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm text-muted-foreground">
+                Mostrando {hasCustomers ? `${rangeStart}–${rangeEnd}` : "0"} de {filteredCustomers.length} clientes
+              </p>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(1)}
+                  disabled={currentPage === 1}
+                >
+                  ««
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                >
+                  «
+                </Button>
+                <span className="text-sm text-muted-foreground">
+                  Página {currentPage} de {pageCount}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage((prev) => Math.min(pageCount, prev + 1))}
+                  disabled={currentPage === pageCount || !hasCustomers}
+                >
+                  »
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(pageCount)}
+                  disabled={currentPage === pageCount || !hasCustomers}
+                >
+                  »»
+                </Button>
+              </div>
+            </div>
+
           </CardContent>
         </Card>
 
