@@ -49,6 +49,8 @@ export default function Customers() {
   >("all");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const PAGE_SIZE = 10;
+  const [currentPage, setCurrentPage] = useState(1);
 
   const {
     getCustomers,
@@ -177,6 +179,37 @@ export default function Customers() {
     const matchesType = filterType === "all" || customer.type === filterType;
     return matchesSearch && matchesType;
   });
+
+  const pageCount = Math.max(
+    1,
+    Math.ceil(filteredCustomers.length / PAGE_SIZE),
+  );
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filterType]);
+
+  useEffect(() => {
+    const nextMax = Math.max(
+      1,
+      Math.ceil(filteredCustomers.length / PAGE_SIZE),
+    );
+    setCurrentPage((prev) => (prev > nextMax ? nextMax : prev));
+  }, [filteredCustomers.length]);
+
+  const paginatedCustomers = useMemo(() => {
+    const start = (currentPage - 1) * PAGE_SIZE;
+    return filteredCustomers.slice(start, start + PAGE_SIZE);
+  }, [filteredCustomers, currentPage]);
+
+  const hasCustomers = filteredCustomers.length > 0;
+  const rangeStart = hasCustomers ? (currentPage - 1) * PAGE_SIZE + 1 : 0;
+  const rangeEnd = hasCustomers
+    ? Math.min(
+        filteredCustomers.length,
+        Math.max(rangeStart, rangeStart + paginatedCustomers.length - 1),
+      )
+    : 0;
 
   const handleSaveCustomer = async (customerData: Partial<Customer>) => {
     try {
@@ -502,126 +535,178 @@ export default function Customers() {
             </div>
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Cliente</TableHead>
-                  <TableHead>Tipo</TableHead>
-                  <TableHead>Contato</TableHead>
-                  <TableHead>Localização</TableHead>
-                  <TableHead>Pedidos</TableHead>
-                  <TableHead>Total Gasto</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredCustomers.map((customer) => (
-                  <TableRow key={customer.id}>
-                    <TableCell>
-                      <div className="flex items-center space-x-3">
-                        <Avatar>
-                          <AvatarFallback className="bg-biobox-green/10 text-biobox-green">
-                            {customer.name
-                              .split(" ")
-                              .map((n) => n[0])
-                              .join("")
-                              .toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <p className="font-medium text-foreground">
-                            {customer.name}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            {customer.type === "individual"
-                              ? customer.cpf
-                              : customer.cnpj}
-                          </p>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center space-x-1">
-                        {customer.type === "individual" ? (
-                          <User className="h-4 w-4 text-blue-500" />
-                        ) : (
-                          <Building className="h-4 w-4 text-orange-500" />
-                        )}
-                        <span className="text-sm">
-                          {customer.type === "individual" ? "PF" : "PJ"}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="space-y-1">
-                        <div className="flex items-center space-x-1 text-sm">
-                          <Mail className="h-3 w-3 text-muted-foreground" />
-                          <span>{customer.email}</span>
-                        </div>
-                        <div className="flex items-center space-x-1 text-sm">
-                          <Phone className="h-3 w-3 text-muted-foreground" />
-                          <span>{customer.phone}</span>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center space-x-1 text-sm">
-                        <MapPin className="h-3 w-3 text-muted-foreground" />
-                        <span>
-                          {customer.address.city}, {customer.address.state}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <span className="font-medium">
-                        {customer.totalOrders}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <span className="font-medium">
-                        {formatCurrency(customer.totalSpent)}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={
-                          customer.status === "active" ? "default" : "secondary"
-                        }
-                        className={cn(
-                          customer.status === "active"
-                            ? "bg-biobox-green/10 text-biobox-green border-biobox-green/20"
-                            : "",
-                        )}
-                      >
-                        {customer.status === "active" ? "Ativo" : "Inativo"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center space-x-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleEditCustomer(customer)}
-                          title="Editar cliente"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDeleteCustomer(customer.id)}
-                          title="Excluir cliente"
-                          className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Cliente</TableHead>
+                    <TableHead>Tipo</TableHead>
+                    <TableHead>Contato</TableHead>
+                    <TableHead>Localização</TableHead>
+                    <TableHead>Pedidos</TableHead>
+                    <TableHead>Total Gasto</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Ações</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {paginatedCustomers.map((customer) => (
+                    <TableRow key={customer.id}>
+                      <TableCell>
+                        <div className="flex items-center space-x-3">
+                          <Avatar>
+                            <AvatarFallback className="bg-biobox-green/10 text-biobox-green">
+                              {customer.name
+                                .split(" ")
+                                .map((n) => n[0])
+                                .join("")
+                                .toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <p className="font-medium text-foreground">
+                              {customer.name}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              {customer.type === "individual"
+                                ? customer.cpf
+                                : customer.cnpj}
+                            </p>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center space-x-1">
+                          {customer.type === "individual" ? (
+                            <User className="h-4 w-4 text-blue-500" />
+                          ) : (
+                            <Building className="h-4 w-4 text-orange-500" />
+                          )}
+                          <span className="text-sm">
+                            {customer.type === "individual" ? "PF" : "PJ"}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="space-y-1">
+                          <div className="flex items-center space-x-1 text-sm">
+                            <Mail className="h-3 w-3 text-muted-foreground" />
+                            <span>{customer.email}</span>
+                          </div>
+                          <div className="flex items-center space-x-1 text-sm">
+                            <Phone className="h-3 w-3 text-muted-foreground" />
+                            <span>{customer.phone}</span>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center space-x-1 text-sm">
+                          <MapPin className="h-3 w-3 text-muted-foreground" />
+                          <span>
+                            {customer.address.city}, {customer.address.state}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <span className="font-medium">
+                          {customer.totalOrders}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <span className="font-medium">
+                          {formatCurrency(customer.totalSpent)}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={
+                            customer.status === "active"
+                              ? "default"
+                              : "secondary"
+                          }
+                          className={cn(
+                            customer.status === "active"
+                              ? "bg-biobox-green/10 text-biobox-green border-biobox-green/20"
+                              : "",
+                          )}
+                        >
+                          {customer.status === "active" ? "Ativo" : "Inativo"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center space-x-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleEditCustomer(customer)}
+                            title="Editar cliente"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDeleteCustomer(customer.id)}
+                            title="Excluir cliente"
+                            className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+
+            <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm text-muted-foreground">
+                Mostrando {hasCustomers ? `${rangeStart}–${rangeEnd}` : "0"} de{" "}
+                {filteredCustomers.length} clientes
+              </p>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(1)}
+                  disabled={currentPage === 1}
+                >
+                  ««
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    setCurrentPage((prev) => Math.max(1, prev - 1))
+                  }
+                  disabled={currentPage === 1}
+                >
+                  «
+                </Button>
+                <span className="text-sm text-muted-foreground">
+                  Página {currentPage} de {pageCount}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    setCurrentPage((prev) => Math.min(pageCount, prev + 1))
+                  }
+                  disabled={currentPage === pageCount || !hasCustomers}
+                >
+                  »
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(pageCount)}
+                  disabled={currentPage === pageCount || !hasCustomers}
+                >
+                  »»
+                </Button>
+              </div>
+            </div>
           </CardContent>
         </Card>
 
