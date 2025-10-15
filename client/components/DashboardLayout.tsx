@@ -42,6 +42,7 @@ const getInitials = (name?: string) => {
 
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const location = useLocation();
   const { user, checkPermission, logout } = useAuth();
 
@@ -76,30 +77,46 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       {filteredNavigation.length > 0 && (
         <div
           className={cn(
-            "fixed inset-y-0 left-0 z-50 w-64 transform bg-sidebar border-r border-sidebar-border transition-transform duration-300 ease-in-out lg:translate-x-0",
+            "fixed inset-y-0 left-0 z-50 transform bg-sidebar border-r border-sidebar-border transition-all duration-300 ease-in-out",
             sidebarOpen
-              ? "translate-x-0"
+              ? "translate-x-0 w-64"
               : "-translate-x-full lg:translate-x-0",
+            sidebarCollapsed && "lg:w-16",
+            !sidebarCollapsed && "lg:w-64"
           )}
         >
           <div className="flex h-full flex-col">
             {/* Logo */}
             <div className="flex h-16 items-center justify-between px-6 border-b border-sidebar-border">
-              <div className="flex items-center space-x-3">
+              <div className={cn(
+                "flex items-center transition-all duration-300",
+                sidebarCollapsed ? "lg:w-0 lg:opacity-0 lg:overflow-hidden" : "lg:w-auto lg:opacity-100"
+              )}>
                 <img
                   src="/logobio.png"
                   alt="BioBox"
                   className="h-10 w-auto object-contain"
                 />
               </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="lg:hidden"
-                onClick={() => setSidebarOpen(false)}
-              >
-                <X className="h-4 w-4" />
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="hidden lg:flex"
+                  onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                  title={sidebarCollapsed ? "Expandir menu" : "Recolher menu"}
+                >
+                  <Menu className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="lg:hidden"
+                  onClick={() => setSidebarOpen(false)}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
 
             {/* Navigation */}
@@ -116,10 +133,17 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                         isActive
                           ? "bg-sidebar-accent text-sidebar-accent-foreground"
                           : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                        sidebarCollapsed && "lg:justify-center"
                       )}
+                      title={sidebarCollapsed ? item.name : undefined}
                     >
-                      <item.icon className="h-4 w-4" />
-                      <span>{item.name}</span>
+                      <item.icon className="h-4 w-4 flex-shrink-0" />
+                      <span className={cn(
+                        "transition-all duration-300",
+                        sidebarCollapsed && "lg:w-0 lg:opacity-0 lg:overflow-hidden"
+                      )}>
+                        {item.name}
+                      </span>
                     </Link>
                   );
                 })}
@@ -128,15 +152,24 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
             {/* User Profile */}
             <div className="border-t border-sidebar-border p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <Avatar className="h-8 w-8">
+              <div className={cn(
+                "flex items-center",
+                sidebarCollapsed ? "lg:justify-center" : "justify-between"
+              )}>
+                <div className={cn(
+                  "flex items-center space-x-3",
+                  sidebarCollapsed && "lg:space-x-0"
+                )}>
+                  <Avatar className="h-8 w-8 flex-shrink-0">
                     <AvatarImage src="/placeholder.svg" />
                     <AvatarFallback className="bg-biobox-green text-biobox-dark text-xs font-medium">
                       {getInitials(user?.name)}
                     </AvatarFallback>
                   </Avatar>
-                  <div className="flex-1 min-w-0">
+                  <div className={cn(
+                    "flex-1 min-w-0 transition-all duration-300",
+                    sidebarCollapsed && "lg:w-0 lg:opacity-0 lg:overflow-hidden"
+                  )}>
                     <p className="text-sm font-medium text-sidebar-foreground truncate">
                       {user?.name || "Usuário"}
                     </p>
@@ -149,7 +182,11 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                   variant="ghost"
                   size="icon"
                   onClick={logout}
-                  className="h-8 w-8"
+                  className={cn(
+                    "h-8 w-8 transition-all duration-300",
+                    sidebarCollapsed && "lg:w-0 lg:opacity-0 lg:overflow-hidden lg:hidden"
+                  )}
+                  title="Sair"
                 >
                   <X className="h-4 w-4" />
                 </Button>
@@ -162,8 +199,10 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       {/* Main content */}
       <div
         className={cn(
-          filteredNavigation.length > 0 ? "lg:pl-64" : "lg:pl-0",
-          "ml-2",
+          "transition-all duration-300",
+          filteredNavigation.length > 0 && !sidebarCollapsed && "lg:pl-64",
+          filteredNavigation.length > 0 && sidebarCollapsed && "lg:pl-16",
+          filteredNavigation.length === 0 && "lg:pl-0"
         )}
       >
         {/* Mobile menu button */}
@@ -181,8 +220,10 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         )}
 
         {/* Page content */}
-        <main className="pt-6 pl-4 pr-0 pb-6 sm:pl-6 sm:pr-0 lg:pt-8 lg:pl-8 lg:pr-0 lg:pb-8 max-w-full">
-          {children}
+        <main className="min-h-screen px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+          <div className="max-w-7xl mx-auto">
+            {children}
+          </div>
         </main>
       </div>
     </div>
