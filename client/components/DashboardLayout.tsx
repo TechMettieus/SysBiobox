@@ -77,7 +77,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         <div
           className={cn(
             "fixed inset-y-0 left-0 z-50 w-64 transform bg-sidebar border-r border-sidebar-border transition-transform duration-300 ease-in-out lg:translate-x-0",
-            sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
+            sidebarOpen
+              ? "translate-x-0"
+              : "-translate-x-full lg:translate-x-0",
           )}
         >
           <div className="flex h-full flex-col">
@@ -158,7 +160,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       )}
 
       {/* Main content */}
-      <div className={cn(filteredNavigation.length > 0 ? "lg:pl-64" : "lg:pl-0")}>
+      <div
+        className={cn(filteredNavigation.length > 0 ? "lg:pl-64" : "lg:pl-0")}
+      >
         {/* Mobile menu button */}
         {filteredNavigation.length > 0 && (
           <div className="lg:hidden fixed top-4 left-4 z-30">
@@ -174,7 +178,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         )}
 
         {/* Page content */}
-        <main className="pt-6 px-4 pb-6 sm:px-6 lg:pt-8 lg:px-8 lg:pb-8 max-w-full">{children}</main>
+        <main className="pt-6 px-4 pb-6 sm:px-6 lg:pt-8 lg:px-8 lg:pb-8 max-w-full">
+          {children}
+        </main>
       </div>
     </div>
   );

@@ -718,30 +718,75 @@ export default function ProductionDashboard({
 
           <div className="pt-4 border-t border-border mt-4">
             {(() => {
-              const relatedOrder = orders.find((o) => o.id === selectedTask.orderId);
+              const relatedOrder = orders.find(
+                (o) => o.id === selectedTask.orderId,
+              );
               if (!relatedOrder) return null;
 
-              const nextStatuses: Record<string, { status: any; label: string; color: string }[]> = {
+              const nextStatuses: Record<
+                string,
+                { status: any; label: string; color: string }[]
+              > = {
                 pending: [
-                  { status: "confirmed", label: "Confirmar", color: "bg-blue-500" },
-                  { status: "cancelled", label: "Cancelar", color: "bg-red-500" },
+                  {
+                    status: "confirmed",
+                    label: "Confirmar",
+                    color: "bg-blue-500",
+                  },
+                  {
+                    status: "cancelled",
+                    label: "Cancelar",
+                    color: "bg-red-500",
+                  },
                 ],
                 confirmed: [
-                  { status: "in_production", label: "Iniciar Produção", color: "bg-purple-500" },
-                  { status: "cancelled", label: "Cancelar", color: "bg-red-500" },
+                  {
+                    status: "in_production",
+                    label: "Iniciar Produção",
+                    color: "bg-purple-500",
+                  },
+                  {
+                    status: "cancelled",
+                    label: "Cancelar",
+                    color: "bg-red-500",
+                  },
                 ],
                 in_production: [
-                  { status: "quality_check", label: "CQ", color: "bg-orange-500" },
-                  { status: "cancelled", label: "Cancelar Produção", color: "bg-red-500" },
+                  {
+                    status: "quality_check",
+                    label: "CQ",
+                    color: "bg-orange-500",
+                  },
+                  {
+                    status: "cancelled",
+                    label: "Cancelar Produção",
+                    color: "bg-red-500",
+                  },
                 ],
                 quality_check: [
                   { status: "ready", label: "Aprovar", color: "bg-green-500" },
-                  { status: "in_production", label: "Reprovar", color: "bg-purple-500" },
-                  { status: "cancelled", label: "Cancelar Produção", color: "bg-red-500" },
+                  {
+                    status: "in_production",
+                    label: "Reprovar",
+                    color: "bg-purple-500",
+                  },
+                  {
+                    status: "cancelled",
+                    label: "Cancelar Produção",
+                    color: "bg-red-500",
+                  },
                 ],
                 ready: [
-                  { status: "delivered", label: "Entregar", color: "bg-gray-500" },
-                  { status: "cancelled", label: "Cancelar Produção", color: "bg-red-500" },
+                  {
+                    status: "delivered",
+                    label: "Entregar",
+                    color: "bg-gray-500",
+                  },
+                  {
+                    status: "cancelled",
+                    label: "Cancelar Produção",
+                    color: "bg-red-500",
+                  },
                 ],
               };
 
@@ -750,23 +795,37 @@ export default function ProductionDashboard({
 
               const handleTransition = async (nextStatus: any) => {
                 const updates: any = { status: nextStatus };
-                if (nextStatus === "in_production") updates.production_progress = 10;
-                if (nextStatus === "quality_check") updates.production_progress = 80;
+                if (nextStatus === "in_production")
+                  updates.production_progress = 10;
+                if (nextStatus === "quality_check")
+                  updates.production_progress = 80;
                 if (nextStatus === "ready") updates.production_progress = 100;
-                if (nextStatus === "delivered") updates.completed_date = new Date().toISOString();
+                if (nextStatus === "delivered")
+                  updates.completed_date = new Date().toISOString();
                 if (nextStatus === "cancelled") updates.production_progress = 0;
 
                 const updated = await updateOrder(relatedOrder.id, updates);
                 if (updated) {
-                  setOrders((prev) => prev.map((o) => (o.id === updated.id ? updated : o)));
-                  setSelectedTask((current) => (current && current.orderId === updated.id ? enrichTask(mapOrderToTask(updated)) : current));
-                  toast({ title: "Status atualizado", description: `Pedido ${updated.order_number} agora está em "${orderStatusLabels[updated.status]}"` });
+                  setOrders((prev) =>
+                    prev.map((o) => (o.id === updated.id ? updated : o)),
+                  );
+                  setSelectedTask((current) =>
+                    current && current.orderId === updated.id
+                      ? enrichTask(mapOrderToTask(updated))
+                      : current,
+                  );
+                  toast({
+                    title: "Status atualizado",
+                    description: `Pedido ${updated.order_number} agora está em "${orderStatusLabels[updated.status]}"`,
+                  });
                 }
               };
 
               return (
                 <div className="flex flex-col gap-2">
-                  <div className="text-xs text-muted-foreground">Alterar status do pedido</div>
+                  <div className="text-xs text-muted-foreground">
+                    Alterar status do pedido
+                  </div>
                   <div className="flex flex-wrap gap-2">
                     {options.map((option) => (
                       <Button
