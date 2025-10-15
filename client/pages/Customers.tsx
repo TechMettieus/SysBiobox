@@ -529,6 +529,7 @@ export default function Customers() {
             </div>
           </CardHeader>
           <CardContent>
+            <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -649,6 +650,7 @@ export default function Customers() {
                 ))}
               </TableBody>
             </Table>
+            </div>
 
             <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-sm text-muted-foreground">
