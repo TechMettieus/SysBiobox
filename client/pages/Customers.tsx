@@ -49,6 +49,8 @@ export default function Customers() {
   >("all");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const PAGE_SIZE = 10;
+  const [currentPage, setCurrentPage] = useState(1);
 
   const {
     getCustomers,
@@ -177,6 +179,31 @@ export default function Customers() {
     const matchesType = filterType === "all" || customer.type === filterType;
     return matchesSearch && matchesType;
   });
+
+  const pageCount = Math.max(1, Math.ceil(filteredCustomers.length / PAGE_SIZE));
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filterType]);
+
+  useEffect(() => {
+    const nextMax = Math.max(1, Math.ceil(filteredCustomers.length / PAGE_SIZE));
+    setCurrentPage((prev) => (prev > nextMax ? nextMax : prev));
+  }, [filteredCustomers.length]);
+
+  const paginatedCustomers = useMemo(() => {
+    const start = (currentPage - 1) * PAGE_SIZE;
+    return filteredCustomers.slice(start, start + PAGE_SIZE);
+  }, [filteredCustomers, currentPage]);
+
+  const hasCustomers = filteredCustomers.length > 0;
+  const rangeStart = hasCustomers ? (currentPage - 1) * PAGE_SIZE + 1 : 0;
+  const rangeEnd = hasCustomers
+    ? Math.min(
+        filteredCustomers.length,
+        Math.max(rangeStart, rangeStart + paginatedCustomers.length - 1),
+      )
+    : 0;
 
   const handleSaveCustomer = async (customerData: Partial<Customer>) => {
     try {
@@ -516,7 +543,7 @@ export default function Customers() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredCustomers.map((customer) => (
+                {paginatedCustomers.map((customer) => (
                   <TableRow key={customer.id}>
                     <TableCell>
                       <div className="flex items-center space-x-3">

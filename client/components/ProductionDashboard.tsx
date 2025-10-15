@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/components/ui/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -18,6 +20,7 @@ import {
   statusLabels,
   priorityColors,
 } from "@/types/production";
+import { statusLabels as orderStatusLabels } from "@/types/order";
 import { Order } from "@/hooks/useFirebase";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
@@ -239,7 +242,8 @@ export default function ProductionDashboard({
   tasks,
   refreshToken,
 }: ProductionDashboardProps) {
-  const { getOrders } = useFirebase();
+  const { getOrders, updateOrder } = useFirebase();
+  const { toast } = useToast();
   const [orders, setOrders] = useState<Order[]>([]);
   const [storedTasks, setStoredTasks] = useState<StoredTask[]>([]);
   const [loading, setLoading] = useState(true);
