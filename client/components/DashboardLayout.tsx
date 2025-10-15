@@ -65,7 +65,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   return (
     <div className="min-h-screen bg-background">
       {/* Mobile sidebar overlay */}
-      {sidebarOpen && (
+      {sidebarOpen && filteredNavigation.length > 0 && (
         <div
           className="fixed inset-0 z-40 bg-background/80 backdrop-blur-sm lg:hidden"
           onClick={() => setSidebarOpen(false)}
@@ -73,104 +73,108 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       )}
 
       {/* Sidebar */}
-      <div
-        className={cn(
-          "fixed inset-y-0 left-0 z-50 w-64 transform bg-sidebar border-r border-sidebar-border transition-transform duration-300 ease-in-out lg:translate-x-0",
-          sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
-        )}
-      >
-        <div className="flex h-full flex-col">
-          {/* Logo */}
-          <div className="flex h-16 items-center justify-between px-6 border-b border-sidebar-border">
-            <div className="flex items-center space-x-3">
-              <img 
-                src="/logobio.png" 
-                alt="BioBox" 
-                className="h-10 w-auto object-contain"
-              />
-            </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="lg:hidden"
-              onClick={() => setSidebarOpen(false)}
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-
-          {/* Navigation */}
-          <ScrollArea className="flex-1 px-3 py-4">
-            <nav className="space-y-1">
-              {filteredNavigation.map((item) => {
-                const isActive = location.pathname === item.href;
-                return (
-                  <Link
-                    key={item.name}
-                    to={item.href}
-                    className={cn(
-                      "flex items-center space-x-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-                      isActive
-                        ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                        : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-                    )}
-                  >
-                    <item.icon className="h-4 w-4" />
-                    <span>{item.name}</span>
-                  </Link>
-                );
-              })}
-            </nav>
-          </ScrollArea>
-
-          {/* User Profile */}
-          <div className="border-t border-sidebar-border p-4">
-            <div className="flex items-center justify-between">
+      {filteredNavigation.length > 0 && (
+        <div
+          className={cn(
+            "fixed inset-y-0 left-0 z-50 w-64 transform bg-sidebar border-r border-sidebar-border transition-transform duration-300 ease-in-out lg:translate-x-0",
+            sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
+          )}
+        >
+          <div className="flex h-full flex-col">
+            {/* Logo */}
+            <div className="flex h-16 items-center justify-between px-6 border-b border-sidebar-border">
               <div className="flex items-center space-x-3">
-                <Avatar className="h-8 w-8">
-                  <AvatarImage src="/placeholder.svg" />
-                  <AvatarFallback className="bg-biobox-green text-biobox-dark text-xs font-medium">
-                    {getInitials(user?.name)}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-sidebar-foreground truncate">
-                    {user?.name || "Usuário"}
-                  </p>
-                  <p className="text-xs text-muted-foreground truncate">
-                    {user?.role === "admin" ? "Administrador" : "Vendedor"}
-                  </p>
-                </div>
+                <img
+                  src="/logobio.png"
+                  alt="BioBox"
+                  className="h-10 w-auto object-contain"
+                />
               </div>
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={logout}
-                className="h-8 w-8"
+                className="lg:hidden"
+                onClick={() => setSidebarOpen(false)}
               >
                 <X className="h-4 w-4" />
               </Button>
             </div>
+
+            {/* Navigation */}
+            <ScrollArea className="flex-1 px-3 py-4">
+              <nav className="space-y-1">
+                {filteredNavigation.map((item) => {
+                  const isActive = location.pathname === item.href;
+                  return (
+                    <Link
+                      key={item.name}
+                      to={item.href}
+                      className={cn(
+                        "flex items-center space-x-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                        isActive
+                          ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                          : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                      )}
+                    >
+                      <item.icon className="h-4 w-4" />
+                      <span>{item.name}</span>
+                    </Link>
+                  );
+                })}
+              </nav>
+            </ScrollArea>
+
+            {/* User Profile */}
+            <div className="border-t border-sidebar-border p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage src="/placeholder.svg" />
+                    <AvatarFallback className="bg-biobox-green text-biobox-dark text-xs font-medium">
+                      {getInitials(user?.name)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-sidebar-foreground truncate">
+                      {user?.name || "Usuário"}
+                    </p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {user?.role === "admin" ? "Administrador" : "Vendedor"}
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={logout}
+                  className="h-8 w-8"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Main content */}
-      <div className="lg:pl-64">
+      <div className={cn(filteredNavigation.length > 0 ? "lg:pl-64" : "lg:pl-0")}>
         {/* Mobile menu button */}
-        <div className="lg:hidden fixed top-4 left-4 z-30">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setSidebarOpen(true)}
-            className="bg-card border border-border"
-          >
-            <Menu className="h-4 w-4" />
-          </Button>
-        </div>
+        {filteredNavigation.length > 0 && (
+          <div className="lg:hidden fixed top-4 left-4 z-30">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setSidebarOpen(true)}
+              className="bg-card border border-border"
+            >
+              <Menu className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
 
         {/* Page content */}
-        <main className="pt-6 pr-6 pb-6 lg:pt-8 lg:pr-8 lg:pb-8">{children}</main>
+        <main className="pt-6 px-4 pb-6 sm:px-6 lg:pt-8 lg:px-8 lg:pb-8 max-w-full">{children}</main>
       </div>
     </div>
   );
