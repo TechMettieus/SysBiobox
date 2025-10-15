@@ -10,8 +10,7 @@ import {
   Calendar,
   BarChart3,
   Settings,
-  Bell,
-  Search,
+  LogOut,
   Menu,
   X,
 } from "lucide-react";
@@ -42,13 +41,12 @@ const getInitials = (name?: string) => {
 
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const location = useLocation();
   const { user, checkPermission, logout } = useAuth();
 
-  // Filter navigation based on user permissions
   const filteredNavigation = navigation.filter((item) => {
     if (!user) return false;
-
     const moduleMap: Record<string, string> = {
       "/": "dashboard",
       "/customers": "customers",
@@ -57,104 +55,82 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       "/products": "products",
       "/settings": "settings",
     };
-
     const module = moduleMap[item.href];
     return module ? checkPermission(module, "view") : false;
   });
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Mobile sidebar overlay */}
-      {sidebarOpen && filteredNavigation.length > 0 && (
-        <div
-          className="fixed inset-0 z-40 bg-background/80 backdrop-blur-sm lg:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
-
+    <div className="min-h-screen bg-background flex">
       {/* Sidebar */}
       {filteredNavigation.length > 0 && (
         <div
           className={cn(
-            "fixed inset-y-0 left-0 z-50 w-64 transform bg-sidebar border-r border-sidebar-border transition-transform duration-300 ease-in-out lg:translate-x-0",
+            "fixed inset-y-0 left-0 z-40 flex flex-col border-r border-border/40 bg-sidebar/60 backdrop-blur-2xl transition-all duration-300 ease-in-out shadow-lg",
             sidebarOpen
-              ? "translate-x-0"
+              ? "translate-x-0 w-20"
               : "-translate-x-full lg:translate-x-0",
+            sidebarCollapsed && "lg:w-20",
+            !sidebarCollapsed && "lg:w-20"
           )}
         >
-          <div className="flex h-full flex-col">
-            {/* Logo */}
-            <div className="flex h-16 items-center justify-between px-6 border-b border-sidebar-border">
-              <div className="flex items-center space-x-3">
-                <img
-                  src="/logobio.png"
-                  alt="BioBox"
-                  className="h-10 w-auto object-contain"
-                />
-              </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="lg:hidden"
-                onClick={() => setSidebarOpen(false)}
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
+          {/* Logo */}
+          <div className="flex items-center justify-center h-16 border-b border-border/40">
+            <img
+              src="/logobio.png"
+              alt="BioBox"
+              className="h-10 w-auto object-contain transition-transform duration-300 hover:scale-105"
+            />
+          </div>
 
-            {/* Navigation */}
-            <ScrollArea className="flex-1 px-3 py-4">
-              <nav className="space-y-1">
-                {filteredNavigation.map((item) => {
-                  const isActive = location.pathname === item.href;
-                  return (
-                    <Link
-                      key={item.name}
-                      to={item.href}
+          {/* Navegação */}
+          <ScrollArea className="flex-1 py-4 space-y-1">
+            <nav className="flex flex-col items-center gap-2">
+              {filteredNavigation.map((item) => {
+                const isActive = location.pathname === item.href;
+                return (
+                  <Link
+                    key={item.name}
+                    to={item.href}
+                    className={cn(
+                      "group relative flex items-center justify-center rounded-xl p-3 transition-all duration-200 hover:bg-primary/10",
+                      isActive
+                        ? "bg-primary/15 text-primary shadow-sm border border-primary/30"
+                        : "text-muted-foreground"
+                    )}
+                    title={item.name}
+                  >
+                    <item.icon
                       className={cn(
-                        "flex items-center space-x-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-                        isActive
-                          ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                          : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                        "h-5 w-5 transition-transform duration-200 group-hover:scale-110",
+                        isActive && "text-primary"
                       )}
-                    >
-                      <item.icon className="h-4 w-4" />
-                      <span>{item.name}</span>
-                    </Link>
-                  );
-                })}
-              </nav>
-            </ScrollArea>
+                    />
+                    {isActive && (
+                      <span className="absolute right-[-6px] top-1/2 -translate-y-1/2 h-6 w-[3px] rounded-full bg-primary" />
+                    )}
+                  </Link>
+                );
+              })}
+            </nav>
+          </ScrollArea>
 
-            {/* User Profile */}
-            <div className="border-t border-sidebar-border p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <Avatar className="h-8 w-8">
-                    <AvatarImage src="/placeholder.svg" />
-                    <AvatarFallback className="bg-biobox-green text-biobox-dark text-xs font-medium">
-                      {getInitials(user?.name)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-sidebar-foreground truncate">
-                      {user?.name || "Usuário"}
-                    </p>
-                    <p className="text-xs text-muted-foreground truncate">
-                      {user?.role === "admin" ? "Administrador" : "Vendedor"}
-                    </p>
-                  </div>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={logout}
-                  className="h-8 w-8"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
+          {/* Footer com avatar */}
+          <div className="border-t border-border/40 p-3 flex flex-col items-center gap-3">
+            <Avatar className="h-9 w-9 border border-border/50">
+              <AvatarImage src="/placeholder.svg" />
+              <AvatarFallback className="bg-primary/20 text-primary text-sm font-semibold">
+                {getInitials(user?.name)}
+              </AvatarFallback>
+            </Avatar>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={logout}
+              title="Sair"
+              className="hover:text-destructive transition-colors"
+            >
+              <LogOut className="h-4 w-4" />
+            </Button>
           </div>
         </div>
       )}
@@ -162,11 +138,11 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       {/* Main content */}
       <div
         className={cn(
-          filteredNavigation.length > 0 ? "lg:pl-64" : "lg:pl-0",
-          "ml-2",
+          "flex-1 transition-all duration-300",
+          filteredNavigation.length > 0 && "lg:ml-22"
         )}
       >
-        {/* Mobile menu button */}
+        {/* Botão menu mobile */}
         {filteredNavigation.length > 0 && (
           <div className="lg:hidden fixed top-4 left-4 z-30">
             <Button
@@ -175,14 +151,13 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               onClick={() => setSidebarOpen(true)}
               className="bg-card border border-border"
             >
-              <Menu className="h-4 w-4" />
+              <Menu className="h-5 w-5" />
             </Button>
           </div>
         )}
 
-        {/* Page content */}
-        <main className="pt-6 pl-4 pr-0 pb-6 sm:pl-6 sm:pr-0 lg:pt-8 lg:pl-8 lg:pr-0 lg:pb-8 max-w-full">
-          {children}
+        <main className="min-h-screen px-6 py-8 bg-gradient-to-b from-background to-muted/20 transition-all">
+          <div className="max-w-7xl mx-auto">{children}</div>
         </main>
       </div>
     </div>
