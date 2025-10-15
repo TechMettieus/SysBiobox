@@ -732,13 +732,16 @@ export default function ProductionDashboard({
                 ],
                 in_production: [
                   { status: "quality_check", label: "CQ", color: "bg-orange-500" },
+                  { status: "cancelled", label: "Cancelar Produção", color: "bg-red-500" },
                 ],
                 quality_check: [
                   { status: "ready", label: "Aprovar", color: "bg-green-500" },
                   { status: "in_production", label: "Reprovar", color: "bg-purple-500" },
+                  { status: "cancelled", label: "Cancelar Produção", color: "bg-red-500" },
                 ],
                 ready: [
                   { status: "delivered", label: "Entregar", color: "bg-gray-500" },
+                  { status: "cancelled", label: "Cancelar Produção", color: "bg-red-500" },
                 ],
               };
 
@@ -751,6 +754,7 @@ export default function ProductionDashboard({
                 if (nextStatus === "quality_check") updates.production_progress = 80;
                 if (nextStatus === "ready") updates.production_progress = 100;
                 if (nextStatus === "delivered") updates.completed_date = new Date().toISOString();
+                if (nextStatus === "cancelled") updates.production_progress = 0;
 
                 const updated = await updateOrder(relatedOrder.id, updates);
                 if (updated) {
