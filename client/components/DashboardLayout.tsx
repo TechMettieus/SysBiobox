@@ -161,7 +161,10 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
       {/* Main content */}
       <div
-        className={cn(filteredNavigation.length > 0 ? "lg:pl-64" : "lg:pl-0")}
+        className={cn(
+          filteredNavigation.length > 0 ? "lg:pl-64" : "lg:pl-0",
+          "ml-2",
+        )}
       >
         {/* Mobile menu button */}
         {filteredNavigation.length > 0 && (
@@ -178,7 +181,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         )}
 
         {/* Page content */}
-        <main className="pt-6 px-4 pb-6 sm:px-6 lg:pt-8 lg:px-8 lg:pb-8 max-w-full">
+        <main className="pt-6 pl-4 pr-0 pb-6 sm:pl-6 sm:pr-0 lg:pt-8 lg:pl-8 lg:pr-0 lg:pb-8 max-w-full">
           {children}
         </main>
       </div>

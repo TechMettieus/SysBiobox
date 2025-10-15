@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import DashboardLayout from "@/components/DashboardLayout";
 import CustomerForm from "@/components/CustomerForm";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
