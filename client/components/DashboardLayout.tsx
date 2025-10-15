@@ -161,7 +161,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
       {/* Main content */}
       <div
-        className={cn(filteredNavigation.length > 0 ? "lg:pl-64" : "lg:pl-0")}
+        className={cn(filteredNavigation.length > 0 ? "lg:pl-64" : "lg:pl-0", "ml-2")}
       >
         {/* Mobile menu button */}
         {filteredNavigation.length > 0 && (
