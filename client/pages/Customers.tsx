@@ -34,6 +34,7 @@ import {
 import { Customer } from "@/types/customer";
 import { cn } from "@/lib/utils";
 import { useFirebase } from "@/hooks/useFirebase";
+import { useAuth } from "@/hooks/useAuth";
 import { db, isFirebaseConfigured } from "@/lib/firebase";
 import { collection, getDocs } from "firebase/firestore";
 
@@ -58,6 +59,9 @@ export default function Customers() {
     updateCustomer: updateCustomerFn,
     deleteCustomer: deleteCustomerFn,
   } = useFirebase();
+  
+  const { user, checkPermission } = useAuth();
+  const isAdmin = user?.role === "admin";
   const { toast } = useToast();
 
   // Carregar clientes diretamente do Firestore quando disponível (fallback para hook)
@@ -544,7 +548,7 @@ export default function Customers() {
                     <TableHead>Contato</TableHead>
                     <TableHead>Localização</TableHead>
                     <TableHead>Pedidos</TableHead>
-                    <TableHead>Total Gasto</TableHead>
+                    {isAdmin && <TableHead>Total Gasto</TableHead>}
                     <TableHead>Status</TableHead>
                     <TableHead>Ações</TableHead>
                   </TableRow>
@@ -612,11 +616,13 @@ export default function Customers() {
                           {customer.totalOrders}
                         </span>
                       </TableCell>
-                      <TableCell>
-                        <span className="font-medium">
-                          {formatCurrency(customer.totalSpent)}
-                        </span>
-                      </TableCell>
+                      {isAdmin && (
+                        <TableCell>
+                          <span className="font-medium">
+                            {formatCurrency(customer.totalSpent)}
+                          </span>
+                        </TableCell>
+                      )}
                       <TableCell>
                         <Badge
                           variant={

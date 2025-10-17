@@ -58,7 +58,6 @@ export default function ProductionStagesTracker({
   const [selectedStage, setSelectedStage] = useState<ProductionStage | null>(null);
   const [showStageDialog, setShowStageDialog] = useState(false);
   const [stageNotes, setStageNotes] = useState("");
-  const [assignedOperator, setAssignedOperator] = useState("");
 
   // Garantir que todas as etapas existam
   const allStages = productionStages.map((stage) => {
@@ -99,7 +98,6 @@ export default function ProductionStagesTracker({
   const handleStartStage = async (stage: ProductionStage) => {
     setSelectedStage(stage);
     setStageNotes(stage.notes || "");
-    setAssignedOperator(stage.assigned_operator || "");
     setShowStageDialog(true);
   };
 
@@ -109,7 +107,6 @@ export default function ProductionStagesTracker({
     const updates: Partial<ProductionStage> = {
       status: newStatus,
       notes: stageNotes,
-      assigned_operator: assignedOperator,
     };
 
     if (newStatus === "in_progress" && !selectedStage.started_at) {
@@ -169,12 +166,6 @@ export default function ProductionStagesTracker({
                       <p className="text-xs text-muted-foreground mt-1">
                         {stageInfo.description}
                       </p>
-                      {stage.assigned_operator && (
-                        <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
-                          <User className="h-3 w-3" />
-                          <span>{stage.assigned_operator}</span>
-                        </div>
-                      )}
                     </div>
                   </div>
                   <div className="flex gap-2">
@@ -230,22 +221,6 @@ export default function ProductionStagesTracker({
           </DialogHeader>
 
           <div className="space-y-4">
-            <div>
-              <Label>Operador Responsável</Label>
-              <Select value={assignedOperator} onValueChange={setAssignedOperator}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione um operador" />
-                </SelectTrigger>
-                <SelectContent>
-                  {operators.map((op) => (
-                    <SelectItem key={op.id} value={op.name}>
-                      {op.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
             <div>
               <Label>Observações</Label>
               <Textarea

@@ -451,9 +451,8 @@ export default function Agenda() {
                         )}
                       >
                         {format(day, "d")}
-                      </div>
-                      <div className="space-y-1">
-                        {ordersForDay.map((order) => (
+                      </div                      <div className="mt-1 space-y-0.5">
+                        {ordersForDay.slice(0, 2).map((order) => (
                           <div
                             key={order.id}
                             draggable
@@ -464,8 +463,15 @@ export default function Agenda() {
                             {order.order_number}
                           </div>
                         ))}
-                      </div>
-                    </div>
+                        {ordersForDay.length > 2 && (
+                          <button
+                            onClick={() => setSelectedDate(day)}
+                            className="text-xs p-1 w-full bg-blue-500/10 border border-blue-500/20 rounded text-blue-600 hover:bg-blue-500/20 transition-colors font-medium"
+                          >
+                            +{ordersForDay.length - 2} mais
+                          </button>
+                        )}
+                      </div>                </div>
                   );
                 })}
               </div>

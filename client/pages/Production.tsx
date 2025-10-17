@@ -42,6 +42,8 @@ export default function Production() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [showStagesDialog, setShowStagesDialog] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const ordersPerPage = 10;
   const { getOrders, updateOrder } = useFirebase();
 
   useEffect(() => {
@@ -221,8 +223,11 @@ export default function Production() {
                         </p>
                       </div>
                     ) : (
-                      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                        {ordersInStage.map((order) => {
+                      <>
+                        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                          {ordersInStage
+                            .slice((currentPage - 1) * ordersPerPage, currentPage * ordersPerPage)
+                            .map((order) => {
                           const status = getStageStatus(order, stage.id);
                           const stageData = order.production_stages?.find(
                             (s) => s.stage === stage.id
@@ -309,8 +314,36 @@ export default function Production() {
                               </CardContent>
                             </Card>
                           );
-                        })}
-                      </div>
+                          })}
+                        </div>
+                        
+                        {/* Paginação */}
+                        {ordersInStage.length > ordersPerPage && (
+                          <div className="flex items-center justify-between mt-6 pt-4 border-t">
+                            <p className="text-sm text-muted-foreground">
+                              Mostrando {((currentPage - 1) * ordersPerPage) + 1} a {Math.min(currentPage * ordersPerPage, ordersInStage.length)} de {ordersInStage.length} pedidos
+                            </p>
+                            <div className="flex gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                disabled={currentPage === 1}
+                              >
+                                Anterior
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setCurrentPage(p => Math.min(Math.ceil(ordersInStage.length / ordersPerPage), p + 1))}
+                                disabled={currentPage >= Math.ceil(ordersInStage.length / ordersPerPage)}
+                              >
+                                Próxima
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </>
                     )}
                   </CardContent>
                 </Card>
