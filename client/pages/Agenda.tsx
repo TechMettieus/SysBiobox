@@ -12,6 +12,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Calendar,
   ChevronLeft,
   ChevronRight,
@@ -26,6 +33,7 @@ import { useFirebase, Order } from "@/hooks/useFirebase";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/components/ui/use-toast";
 import { cn } from "@/lib/utils";
+import ProductionPanorama from "@/components/ProductionPanorama";
 import {
   format,
   startOfMonth,
@@ -80,6 +88,7 @@ export default function Agenda() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | Order["status"]>("awaiting_approval");
   const [customerFilter, setCustomerFilter] = useState("all");
+  const [showPanorama, setShowPanorama] = useState(false);
 
   const { getOrders, updateOrder } = useFirebase();
   const { user, checkPermission } = useAuth();
@@ -226,7 +235,7 @@ export default function Agenda() {
   };
 
   const handlePrintPanorama = () => {
-    window.print();
+    setShowPanorama(true);
   };
 
   const uniqueCustomers = Array.from(
@@ -517,22 +526,22 @@ export default function Agenda() {
         )}
       </div>
 
-      {/* Estilos para impressão */}
-      <style>{`
-        @media print {
-          body * {
-            visibility: hidden;
-          }
-          .print-area, .print-area * {
-            visibility: visible;
-          }
-          .print-area {
-            position: absolute;
-            left: 0;
-            top: 0;
-          }
-        }
-      `}</style>
+      {/* Dialog do Panorama de Produção */}
+      <Dialog open={showPanorama} onOpenChange={setShowPanorama}>
+        <DialogContent className="max-w-7xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Panorama de Produção</DialogTitle>
+            <DialogDescription>
+              Visualização completa dos pedidos agendados
+            </DialogDescription>
+          </DialogHeader>
+          <ProductionPanorama
+            orders={orders.filter(o => o.scheduled_date)}
+            startDate={monthStart}
+            endDate={monthEnd}
+          />
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 }

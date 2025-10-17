@@ -5,6 +5,7 @@ import DashboardLayout from "@/components/DashboardLayout";
 import NewOrderForm from "@/components/NewOrderForm";
 import OrderFragmentForm from "@/components/OrderFragmentForm";
 import OrderEditForm from "@/components/OrderEditForm";
+import ProductionStagesTracker from "@/components/ProductionStagesTracker";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -1581,6 +1582,40 @@ export default function Orders() {
                       </CardContent>
                     </Card>
                   )}
+
+                {/* Etapas de Produção */}
+                {selectedOrder.status !== "pending" && selectedOrder.status !== "awaiting_approval" && selectedOrder.status !== "cancelled" && (
+                  <ProductionStagesTracker
+                    orderId={selectedOrder.id}
+                    orderNumber={selectedOrder.order_number}
+                    stages={selectedOrder.production_stages || []}
+                    onUpdateStage={async (stageId, updates) => {
+                      const updatedStages = [...(selectedOrder.production_stages || [])];
+                      const stageIndex = updatedStages.findIndex(s => s.stage === stageId);
+                      
+                      if (stageIndex >= 0) {
+                        updatedStages[stageIndex] = { ...updatedStages[stageIndex], ...updates };
+                      } else {
+                        updatedStages.push({ stage: stageId, ...updates } as any);
+                      }
+                      
+                      await updateOrder(selectedOrder.id, {
+                        ...selectedOrder,
+                        production_stages: updatedStages,
+                      });
+                      
+                      setSelectedOrder({
+                        ...selectedOrder,
+                        production_stages: updatedStages,
+                      });
+                    }}
+                    operators={[
+                      { id: "1", name: "João Silva" },
+                      { id: "2", name: "Maria Santos" },
+                      { id: "3", name: "Pedro Costa" },
+                    ]}
+                  />
+                )}
 
                 {/* Observações */}
                 {selectedOrder.notes && (
