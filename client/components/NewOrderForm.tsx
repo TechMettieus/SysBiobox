@@ -62,7 +62,7 @@ export default function NewOrderForm({
   onOpenChange,
   onOrderCreated,
 }: NewOrderFormProps) {
-  const { user } = useAuth();
+  const { user, checkPermission } = useAuth();
   const { getCustomers, getProducts } = useFirebase();
   const { toast } = useToast();
 
@@ -245,14 +245,15 @@ export default function NewOrderForm({
         return;
       }
 
-      if (!orderDetails.scheduledDate) {
-        toast({
-          title: "Data obrigatória",
-          description: "Defina a data de produção",
-          variant: "destructive",
-        });
-        return;
-      }
+      // Data de produção é opcional - será definida na Agenda pelo admin
+      // if (!orderDetails.scheduledDate) {
+      //   toast({
+      //     title: "Campos obrigatórios",
+      //     description: "Por favor, preencha a data de produção",
+      //     variant: "destructive",
+      //   });
+      //   return;
+      // }
 
       // Verificar se todos os produtos estão completos
       const hasIncompleteProducts = orderProducts.some(
@@ -289,7 +290,7 @@ export default function NewOrderForm({
         customer_email: customer.email || "",
         seller_id: user?.id || "",
         seller_name: user?.name || "",
-        status: "pending" as const,
+        status: (checkPermission("orders", "approve") ? "pending" : "awaiting_approval") as const,
         priority: orderDetails.priority,
         total_amount: calculateTotal(),
         scheduled_date: orderDetails.scheduledDate,
@@ -738,21 +739,26 @@ export default function NewOrderForm({
                   </SelectContent>
                 </Select>
               </div>
-              <div>
-                <Label htmlFor="scheduledDate">Data de Produção *</Label>
-                <Input
-                  id="scheduledDate"
-                  type="date"
-                  value={orderDetails.scheduledDate}
-                  onChange={(e) =>
-                    setOrderDetails({
-                      ...orderDetails,
-                      scheduledDate: e.target.value,
-                    })
-                  }
-                  min={new Date().toISOString().split("T")[0]}
-                />
-              </div>
+              {checkPermission("orders", "approve") && (
+                <div>
+                  <Label htmlFor="scheduledDate">Data de Produção</Label>
+                  <Input
+                    id="scheduledDate"
+                    type="date"
+                    value={orderDetails.scheduledDate}
+                    onChange={(e) =>
+                      setOrderDetails({
+                        ...orderDetails,
+                        scheduledDate: e.target.value,
+                      })
+                    }
+                    min={new Date().toISOString().split("T")[0]}
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Deixe em branco para agendar depois na Agenda
+                  </p>
+                </div>
+              )}
             </div>
 
             <div>

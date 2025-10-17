@@ -76,6 +76,7 @@ export interface Order {
   seller_id: string;
   status:
     | "pending"
+    | "awaiting_approval"
     | "confirmed"
     | "in_production"
     | "quality_check"
@@ -100,6 +101,13 @@ export interface Order {
   is_fragmented?: boolean;
   fragments?: OrderFragment[];
   total_quantity?: number;
+  production_stages?: {
+    stage: string;
+    status: "pending" | "in_progress" | "completed";
+    started_at?: string;
+    completed_at?: string;
+    assigned_operator?: string;
+  }[];
 }
 
 export interface OrderFragment {

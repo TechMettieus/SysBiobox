@@ -78,60 +78,52 @@ export interface Operator {
 
 export const productionStages: ProductionStage[] = [
   {
-    id: 'design',
-    name: 'Design e Medidas',
+    id: 'cutting_sewing',
+    name: 'Corte e Costura',
     order: 1,
-    estimatedTime: 30,
-    requiredSkills: ['design', 'measurement'],
-    description: 'Criação do projeto e tomada de medidas'
-  },
-  {
-    id: 'cutting',
-    name: 'Corte de Materiais',
-    order: 2,
-    estimatedTime: 60,
-    requiredSkills: ['cutting', 'material_handling'],
-    description: 'Corte de madeira, tecidos e espumas'
-  },
-  {
-    id: 'frame_assembly',
-    name: 'Montagem da Estrutura',
-    order: 3,
     estimatedTime: 120,
-    requiredSkills: ['carpentry', 'assembly'],
-    description: 'Montagem da estrutura de madeira'
+    requiredSkills: ['cutting', 'sewing'],
+    description: 'Corte de materiais e costura inicial'
+  },
+  {
+    id: 'carpentry',
+    name: 'Marcenaria',
+    order: 2,
+    estimatedTime: 180,
+    requiredSkills: ['carpentry', 'woodwork'],
+    description: 'Trabalhos de marcenaria e estrutura'
   },
   {
     id: 'upholstery',
-    name: 'Estofamento',
+    name: 'Tapeçaria',
+    order: 3,
+    estimatedTime: 240,
+    requiredSkills: ['upholstery', 'fabric_work'],
+    description: 'Trabalhos de tapeçaria e estofamento'
+  },
+  {
+    id: 'assembly',
+    name: 'Montagem',
     order: 4,
-    estimatedTime: 180,
-    requiredSkills: ['upholstery', 'sewing'],
-    description: 'Aplicação de espuma e revestimento'
-  },
-  {
-    id: 'finishing',
-    name: 'Acabamento',
-    order: 5,
     estimatedTime: 90,
-    requiredSkills: ['finishing', 'detail_work'],
-    description: 'Acabamentos finais e detalhes'
-  },
-  {
-    id: 'quality_control',
-    name: 'Controle de Qualidade',
-    order: 6,
-    estimatedTime: 30,
-    requiredSkills: ['quality_control'],
-    description: 'Inspeção final e aprovação'
+    requiredSkills: ['assembly', 'finishing'],
+    description: 'Montagem final do produto'
   },
   {
     id: 'packaging',
     name: 'Embalagem',
-    order: 7,
-    estimatedTime: 45,
+    order: 5,
+    estimatedTime: 30,
     requiredSkills: ['packaging'],
     description: 'Embalagem para transporte'
+  },
+  {
+    id: 'delivery',
+    name: 'Entrega',
+    order: 6,
+    estimatedTime: 60,
+    requiredSkills: ['logistics', 'delivery'],
+    description: 'Entrega ao cliente'
   }
 ];
 

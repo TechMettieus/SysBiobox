@@ -67,6 +67,7 @@ import { OrderFragment as UiOrderFragment } from "@/types/order";
 
 const statusLabels = {
   pending: "Pendente",
+  awaiting_approval: "Aguardando Aprovação",
   confirmed: "Confirmado",
   in_production: "Em Produção",
   quality_check: "Controle de Qualidade",
@@ -77,6 +78,7 @@ const statusLabels = {
 
 const statusColors = {
   pending: "bg-yellow-500/10 text-yellow-500 border-yellow-500/20",
+  awaiting_approval: "bg-orange-500/10 text-orange-500 border-orange-500/20",
   confirmed: "bg-blue-500/10 text-blue-500 border-blue-500/20",
   in_production: "bg-purple-500/10 text-purple-500 border-purple-500/20",
   quality_check: "bg-orange-500/10 text-orange-500 border-orange-500/20",
