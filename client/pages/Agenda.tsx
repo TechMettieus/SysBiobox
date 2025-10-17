@@ -451,7 +451,8 @@ export default function Agenda() {
                         )}
                       >
                         {format(day, "d")}
-                      </div                      <div className="mt-1 space-y-0.5">
+                      </div>
+                      <div className="mt-1 space-y-0.5">
                         {ordersForDay.slice(0, 2).map((order) => (
                           <div
                             key={order.id}
@@ -471,7 +472,8 @@ export default function Agenda() {
                             +{ordersForDay.length - 2} mais
                           </button>
                         )}
-                      </div>                </div>
+                      </div>
+                    </div>
                   );
                 })}
               </div>
