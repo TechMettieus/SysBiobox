@@ -211,7 +211,7 @@ export default function Agenda() {
     try {
       const updatedOrder = {
         ...order,
-        status: "awaiting_approval" as Order["status"],
+        status: "confirmed" as Order["status"],
       };
 
       await updateOrder(order.id, updatedOrder);
