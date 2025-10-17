@@ -10,6 +10,7 @@ import OrdersPage from "@/pages/Orders";
 import CustomersPage from "@/pages/Customers";
 import ProductsPage from "@/pages/Products";
 import ProductionPage from "@/pages/Production";
+import AgendaPage from "@/pages/Agenda";
 import SettingsPage from "@/pages/Settings";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -70,6 +71,14 @@ function AppRoutes() {
         <ProtectedRoute module="production" action="view">
           <DashboardLayout>
             <ProductionPage />
+          </DashboardLayout>
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/agenda" element={
+        <ProtectedRoute module="orders" action="approve">
+          <DashboardLayout>
+            <AgendaPage />
           </DashboardLayout>
         </ProtectedRoute>
       } />
