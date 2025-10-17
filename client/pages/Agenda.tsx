@@ -456,8 +456,10 @@ export default function Agenda() {
                         {ordersForDay.map((order) => (
                           <div
                             key={order.id}
-                            className="text-xs p-1 bg-biobox-green/10 border border-biobox-green/20 rounded truncate"
-                            title={`${order.order_number} - ${order.customer_name}`}
+                            draggable
+                            onDragStart={() => handleDragStart(order)}
+                            className="text-xs p-1 bg-biobox-green/10 border border-biobox-green/20 rounded truncate cursor-move hover:bg-biobox-green/20 transition-colors"
+                            title={`${order.order_number} - ${order.customer_name} (Arraste para mover)`}
                           >
                             {order.order_number}
                           </div>
