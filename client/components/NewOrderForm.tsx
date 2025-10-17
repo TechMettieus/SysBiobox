@@ -90,6 +90,15 @@ export default function NewOrderForm({
     }
 
     setSelectedCustomer(customer);
+    
+    // Aplicar desconto padrão do cliente
+    if (customer.default_discount && customer.default_discount > 0) {
+      setOrderDetails(prev => ({
+        ...prev,
+        discount_percentage: customer.default_discount
+      }));
+    }
+    
     console.log("✅ Cliente selecionado com sucesso");
   };
   const [newCustomer, setNewCustomer] = useState({
@@ -104,6 +113,7 @@ export default function NewOrderForm({
     scheduledDate: "",
     deliveryDate: "",
     notes: "",
+    discount_percentage: 0,
   });
   const [showNewCustomerForm, setShowNewCustomerForm] = useState(false);
   const [customerSearch, setCustomerSearch] = useState("");
@@ -205,8 +215,19 @@ export default function NewOrderForm({
     setOrderProducts(updated);
   };
 
-  const calculateTotal = () => {
+  const calculateSubtotal = () => {
     return orderProducts.reduce((sum, product) => sum + product.totalPrice, 0);
+  };
+
+  const calculateDiscountAmount = () => {
+    const subtotal = calculateSubtotal();
+    return (subtotal * (orderDetails.discount_percentage || 0)) / 100;
+  };
+
+  const calculateTotal = () => {
+    const subtotal = calculateSubtotal();
+    const discount = calculateDiscountAmount();
+    return subtotal - discount;
   };
 
   const formatCurrency = (value: number) => {
@@ -292,6 +313,9 @@ export default function NewOrderForm({
         seller_name: user?.name || "",
         status: (checkPermission("orders", "approve") ? "pending" : "awaiting_approval") as const,
         priority: orderDetails.priority,
+        subtotal: calculateSubtotal(),
+        discount_percentage: orderDetails.discount_percentage || 0,
+        discount_amount: calculateDiscountAmount(),
         total_amount: calculateTotal(),
         scheduled_date: orderDetails.scheduledDate,
         delivery_date: orderDetails.deliveryDate || null,
@@ -761,6 +785,36 @@ export default function NewOrderForm({
               )}
             </div>
 
+            {/* Campo de Desconto */}
+            <div>
+              <Label htmlFor="discount_percentage">
+                Desconto (%)
+                {selectedCustomer?.default_discount > 0 && (
+                  <span className="text-xs text-muted-foreground ml-2">
+                    (Padrão do cliente: {selectedCustomer.default_discount}%)
+                  </span>
+                )}
+              </Label>
+              <Input
+                id="discount_percentage"
+                type="number"
+                min="0"
+                max="100"
+                step="0.01"
+                value={orderDetails.discount_percentage}
+                onChange={(e) =>
+                  setOrderDetails({
+                    ...orderDetails,
+                    discount_percentage: parseFloat(e.target.value) || 0,
+                  })
+                }
+                placeholder="0.00"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Desconto aplicado sobre o valor total dos produtos
+              </p>
+            </div>
+
             {checkPermission("orders", "approve") && (
               <div>
                 <Label htmlFor="deliveryDate">Data de Entrega (Opcional)</Label>
@@ -824,11 +878,23 @@ export default function NewOrderForm({
                     unidades
                   </span>
                 </div>
-                <div className="flex justify-between text-lg font-bold">
-                  <span>Total:</span>
-                  <span className="text-biobox-green">
-                    {formatCurrency(calculateTotal())}
-                  </span>
+                <div className="border-t pt-2 mt-2 space-y-2">
+                  <div className="flex justify-between">
+                    <span>Subtotal:</span>
+                    <span>{formatCurrency(calculateSubtotal())}</span>
+                  </div>
+                  {orderDetails.discount_percentage > 0 && (
+                    <div className="flex justify-between text-orange-600">
+                      <span>Desconto ({orderDetails.discount_percentage}%):</span>
+                      <span>- {formatCurrency(calculateDiscountAmount())}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-lg font-bold border-t pt-2">
+                    <span>Total:</span>
+                    <span className="text-biobox-green">
+                      {formatCurrency(calculateTotal())}
+                    </span>
+                  </div>
                 </div>
               </CardContent>
             </Card>

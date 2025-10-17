@@ -38,6 +38,7 @@ export interface Customer {
   city?: string;
   state?: string;
   zip_code?: string;
+  default_discount?: number; // Desconto padrão em porcentagem (0-100)
   created_at: string;
   updated_at: string;
 }
@@ -84,7 +85,10 @@ export interface Order {
     | "delivered"
     | "cancelled";
   priority: "low" | "medium" | "high" | "urgent";
-  total_amount: number;
+  subtotal?: number; // Valor antes do desconto
+  discount_percentage?: number; // Desconto em porcentagem (0-100)
+  discount_amount?: number; // Valor do desconto em reais
+  total_amount: number; // Valor final após desconto
   scheduled_date: string;
   delivery_date?: string;
   completed_date?: string;

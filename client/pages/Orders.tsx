@@ -652,12 +652,42 @@ export default function Orders() {
     if (nextStatus === "delivered") {
       (updates as any).completed_date = new Date().toISOString();
     }
+    
+    // Ao iniciar produção, iniciar automaticamente a primeira etapa (Corte e Costura)
+    if (nextStatus === "in_production") {
+      const productionStages = order.production_stages || [];
+      const firstStage = productionStages.find(s => s.stage === "cutting_sewing");
+      
+      if (!firstStage || firstStage.status === "pending") {
+        const updatedStages = [...productionStages];
+        const stageIndex = updatedStages.findIndex(s => s.stage === "cutting_sewing");
+        
+        if (stageIndex >= 0) {
+          updatedStages[stageIndex] = {
+            ...updatedStages[stageIndex],
+            status: "in_progress",
+            started_at: new Date().toISOString(),
+          };
+        } else {
+          updatedStages.push({
+            stage: "cutting_sewing",
+            status: "in_progress",
+            started_at: new Date().toISOString(),
+          });
+        }
+        
+        (updates as any).production_stages = updatedStages;
+      }
+    }
+    
     const updated = await updateOrder(order.id, updates);
     if (updated) {
       applyUpdate(updated);
       toast({
         title: "Status atualizado",
-        description: `Pedido ${updated.order_number} agora está em "${statusLabels[nextStatus]}"`,
+        description: nextStatus === "in_production" 
+          ? `Pedido ${updated.order_number} iniciado na etapa de Corte e Costura`
+          : `Pedido ${updated.order_number} agora está em "${statusLabels[nextStatus]}"`,
       });
       if (nextStatus === "in_production") {
         navigate(`/production?orderId=${updated.id}`);

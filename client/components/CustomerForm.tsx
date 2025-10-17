@@ -23,6 +23,7 @@ export default function CustomerForm({ customer, onSave, onCancel }: CustomerFor
     cpf: customer?.cpf || '',
     cnpj: customer?.cnpj || '',
     type: customer?.type || 'individual' as 'individual' | 'business',
+    default_discount: customer?.default_discount || 0,
     address: {
       street: customer?.address?.street || '',
       number: customer?.address?.number || '',
@@ -250,6 +251,29 @@ export default function CustomerForm({ customer, onSave, onCancel }: CustomerFor
                   />
                 </div>
               </div>
+            </div>
+
+            {/* Desconto Padrão */}
+            <div>
+              <Label htmlFor="default_discount">
+                Desconto Padrão (%)
+                <span className="text-xs text-muted-foreground ml-2">
+                  (Aplicado automaticamente em novos pedidos)
+                </span>
+              </Label>
+              <Input
+                id="default_discount"
+                type="number"
+                min="0"
+                max="100"
+                step="0.01"
+                value={formData.default_discount}
+                onChange={(e) => handleInputChange('default_discount', e.target.value)}
+                placeholder="0.00"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Exemplo: 10 = 10% de desconto
+              </p>
             </div>
 
             <div className="flex justify-end space-x-4 pt-4">
