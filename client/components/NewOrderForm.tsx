@@ -761,24 +761,26 @@ export default function NewOrderForm({
               )}
             </div>
 
-            <div>
-              <Label htmlFor="deliveryDate">Data de Entrega (Opcional)</Label>
-              <Input
-                id="deliveryDate"
-                type="date"
-                value={orderDetails.deliveryDate}
-                onChange={(e) =>
-                  setOrderDetails({
-                    ...orderDetails,
-                    deliveryDate: e.target.value,
-                  })
-                }
-                min={
-                  orderDetails.scheduledDate ||
-                  new Date().toISOString().split("T")[0]
-                }
-              />
-            </div>
+            {checkPermission("orders", "approve") && (
+              <div>
+                <Label htmlFor="deliveryDate">Data de Entrega (Opcional)</Label>
+                <Input
+                  id="deliveryDate"
+                  type="date"
+                  value={orderDetails.deliveryDate}
+                  onChange={(e) =>
+                    setOrderDetails({
+                      ...orderDetails,
+                      deliveryDate: e.target.value,
+                    })
+                  }
+                  min={
+                    orderDetails.scheduledDate ||
+                    new Date().toISOString().split("T")[0]
+                  }
+                />
+              </div>
+            )}
 
             <div>
               <Label htmlFor="notes">Observações</Label>

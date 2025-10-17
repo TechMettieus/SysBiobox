@@ -1604,10 +1604,15 @@ export default function Orders() {
                         production_stages: updatedStages,
                       });
                       
-                      setSelectedOrder({
-                        ...selectedOrder,
-                        production_stages: updatedStages,
-                      });
+                      // Recarregar a lista de pedidos
+                      const updatedOrders = await getOrders();
+                      setOrders(updatedOrders);
+                      
+                      // Atualizar o pedido selecionado
+                      const refreshedOrder = updatedOrders.find(o => o.id === selectedOrder.id);
+                      if (refreshedOrder) {
+                        setSelectedOrder(refreshedOrder);
+                      }
                     }}
                     operators={[
                       { id: "1", name: "João Silva" },
