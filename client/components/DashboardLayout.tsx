@@ -8,6 +8,7 @@ import {
   Users,
   Package,
   Calendar,
+  CalendarCheck,
   BarChart3,
   Settings,
   LogOut,
@@ -25,6 +26,7 @@ const navigation = [
   { name: "Dashboard", href: "/", icon: Home },
   { name: "Clientes", href: "/customers", icon: Users },
   { name: "Pedidos", href: "/orders", icon: Calendar },
+  { name: "Agenda", href: "/agenda", icon: CalendarCheck, requiresPermission: { module: "orders", action: "approve" } },
   { name: "Produção", href: "/production", icon: BarChart3 },
   { name: "Produtos", href: "/products", icon: Package },
   { name: "Configurações", href: "/settings", icon: Settings },
@@ -47,10 +49,18 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
   const filteredNavigation = navigation.filter((item) => {
     if (!user) return false;
+    
+    // Verificar permissão específica se definida
+    if ('requiresPermission' in item && item.requiresPermission) {
+      const perm = item.requiresPermission as { module: string; action: string };
+      return checkPermission(perm.module, perm.action);
+    }
+    
     const moduleMap: Record<string, string> = {
       "/": "dashboard",
       "/customers": "customers",
       "/orders": "orders",
+      "/agenda": "orders",
       "/production": "production",
       "/products": "products",
       "/settings": "settings",
