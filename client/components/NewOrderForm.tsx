@@ -221,13 +221,17 @@ export default function NewOrderForm({
 
   const calculateDiscountAmount = () => {
     const subtotal = calculateSubtotal();
-    return (subtotal * (orderDetails.discount_percentage || 0)) / 100;
+    const discount = (subtotal * (orderDetails.discount_percentage || 0)) / 100;
+    // Arredondar para 2 casas decimais para evitar erros de ponto flutuante
+    return Math.round(discount * 100) / 100;
   };
 
   const calculateTotal = () => {
     const subtotal = calculateSubtotal();
     const discount = calculateDiscountAmount();
-    return subtotal - discount;
+    const total = subtotal - discount;
+    // Arredondar para 2 casas decimais
+    return Math.round(total * 100) / 100;
   };
 
   const formatCurrency = (value: number) => {

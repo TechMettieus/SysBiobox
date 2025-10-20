@@ -42,7 +42,14 @@ export default function Production() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [showStagesDialog, setShowStagesDialog] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPages, setCurrentPages] = useState<Record<string, number>>({
+    cutting_sewing: 1,
+    carpentry: 1,
+    upholstery: 1,
+    assembly: 1,
+    packaging: 1,
+    delivery: 1,
+  });
   const ordersPerPage = 10;
   const { getOrders, updateOrder } = useFirebase();
 
@@ -226,7 +233,7 @@ export default function Production() {
                       <>
                         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                           {ordersInStage
-                            .slice((currentPage - 1) * ordersPerPage, currentPage * ordersPerPage)
+                            .slice((currentPages[stage.id] - 1) * ordersPerPage, currentPages[stage.id] * ordersPerPage)
                             .map((order) => {
                           const status = getStageStatus(order, stage.id);
                           const stageData = order.production_stages?.find(
@@ -321,22 +328,22 @@ export default function Production() {
                         {ordersInStage.length > ordersPerPage && (
                           <div className="flex items-center justify-between mt-6 pt-4 border-t">
                             <p className="text-sm text-muted-foreground">
-                              Mostrando {((currentPage - 1) * ordersPerPage) + 1} a {Math.min(currentPage * ordersPerPage, ordersInStage.length)} de {ordersInStage.length} pedidos
+                              Mostrando {((currentPages[stage.id] - 1) * ordersPerPage) + 1} a {Math.min(currentPages[stage.id] * ordersPerPage, ordersInStage.length)} de {ordersInStage.length} pedidos
                             </p>
                             <div className="flex gap-2">
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                                disabled={currentPage === 1}
+                                onClick={() => setCurrentPages(prev => ({ ...prev, [stage.id]: Math.max(1, prev[stage.id] - 1) }))}
+                                disabled={currentPages[stage.id] === 1}
                               >
                                 Anterior
                               </Button>
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => setCurrentPage(p => Math.min(Math.ceil(ordersInStage.length / ordersPerPage), p + 1))}
-                                disabled={currentPage >= Math.ceil(ordersInStage.length / ordersPerPage)}
+                                onClick={() => setCurrentPages(prev => ({ ...prev, [stage.id]: Math.min(Math.ceil(ordersInStage.length / ordersPerPage), prev[stage.id] + 1) }))}
+                                disabled={currentPages[stage.id] >= Math.ceil(ordersInStage.length / ordersPerPage)}
                               >
                                 Próxima
                               </Button>
